@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dashboard — HealthShield AI{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Dashboard</li>{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="dashboard-root">
+<!-- KPI Cards Row — 4 tarjetas HealthShield AI -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+<div class="card metric-card p-3 border-start border-danger border-4 reveal" data-reveal>
+            <div class="d-flex align-items-center gap-3">
+                <div class="icon bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-heart-pulse"></i>
+                </div>
+                <div>
+                    <p class="small text-muted mb-0">Pacientes en Riesgo</p>
+                    <h3 class="mb-0" id="kpiRiesgo">—</h3>
+                    <small class="text-muted" id="kpiRiesgoDetalle">Alto + Crítico</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+<div class="card metric-card p-3 border-start border-warning border-4 reveal">
+            <div class="d-flex align-items-center gap-3">
+                <div class="icon bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-droplet"></i>
+                </div>
+                <div>
+                    <p class="small text-muted mb-0">Promedio Glucosa</p>
+                    <h3 class="mb-0" id="kpiGlucosa">—</h3>
+                    <small class="text-muted">mg/dL</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+<div class="card metric-card p-3 border-start border-primary border-4 reveal">
+            <div class="d-flex align-items-center gap-3">
+                <div class="icon bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-arrow-repeat"></i>
+                </div>
+                <div>
+                    <p class="small text-muted mb-0">Total ETL Procesado</p>
+                    <h3 class="mb-0" id="kpiETL">—</h3>
+                    <small class="text-muted" id="kpiETLDetalle">registros</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+<div class="card metric-card p-3 border-start border-dark border-4 reveal">
+            <div class="d-flex align-items-center gap-3">
+                <div class="icon bg-secondary bg-opacity-10 text-secondary">
+                    <i class="bi bi-exclamation-octagon"></i>
+                </div>
+                <div>
+                    <p class="small text-muted mb-0">Alertas Críticas</p>
+                    <h3 class="mb-0" id="kpiAlertasCriticas">—</h3>
+                    <small class="text-muted">requieren atención</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main charts row -->
+<div class="row g-4 mb-4">
+    <!-- Donut: Riesgo distribution -->
+    <div class="col-lg-4">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">Distribución por Riesgo</h6>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="chartRiesgo"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bar horizontal: Top diagnósticos -->
+    <div class="col-lg-8">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">Top Diagnósticos</h6>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="chartDiagnosticos"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Second row -->
+<div class="row g-4 mb-4">
+    <!-- Line: IMC por edad -->
+    <div class="col-lg-6">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">IMC Promedio por Grupo Etario</h6>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="chartIMCEdad"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scatter: Glucosa vs Presión -->
+    <div class="col-lg-6">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">Glucosa vs Presión Sistólica</h6>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="chartGlucosaPresion"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Third row: ETL trend + Alerts urgency -->
+<div class="row g-4 mb-4">
+    <!-- ETL tendencia Area -->
+    <div class="col-lg-6">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">Tendencia ETL — Quality Score</h6>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="chartETLTendencia"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas por nivel de urgencia -->
+    <div class="col-lg-6">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">Alertas por Nivel de Urgencia</h6>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="chartAlertas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fourth row: Signos vitales -->
+<div class="row g-4">
+    <!-- Quick stats -->
+    <div class="col-12">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">Signos Vitales Promedio</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm small mb-0">
+                    <tbody id="vitalsTable">
+                        <tr><td>IMC Promedio</td><td id="vtIMC">—</td></tr>
+                        <tr><td>Glucosa Promedio</td><td id="vtGlucosa">—</td></tr>
+                        <tr><td>Presión Sistólica Promedio</td><td id="vtPresion">—</td></tr>
+                        <tr><td>Última ejecución ETL</td><td id="vtUltimaETL">—</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ── Charts instances ─────────────────────────────────────────────────────────
+let chartRiesgo, chartDiagnosticos, chartIMCEdad, chartGlucosaPresion, chartETLTendencia, chartAlertas;
+
+async function loadDashboard() {
+    showLoading();
+    try {
+        const resp = await apiFetch('/api/dashboard/');
+        if (!resp.ok) { throw new Error('Error cargando dashboard'); }
+        const data = await resp.json();
+
+        // KPI cards — 4 indicadores principales
+        document.getElementById('kpiRiesgo').textContent =
+            (data.kpi_resumen.pacientes_riesgo_alto || 0).toLocaleString();
+        document.getElementById('kpiGlucosa').textContent =
+            data.kpi_resumen.promedio_glucosa || '��';
+        document.getElementById('kpiETL').textContent =
+            (data.kpi_resumen.total_registros_procesados || 0).toLocaleString();
+        document.getElementById('kpiAlertasCriticas').textContent =
+            (data.kpi_resumen.alertas_criticas || 0).toLocaleString();
+
+        // Vita signs table
+        document.getElementById('vtIMC').textContent = data.kpi_resumen.promedio_imc || '—';
+        document.getElementById('vtGlucosa').textContent =
+            data.kpi_resumen.promedio_glucosa ? `${data.kpi_resumen.promedio_glucosa} mg/dL` : '—';
+        document.getElementById('vtPresion').textContent =
+            data.kpi_resumen.promedio_presion_sistolica
+                ? `${data.kpi_resumen.promedio_presion_sistolica} mmHg`
+                : '—';
+        document.getElementById('vtUltimaETL').textContent =
+            data.kpi_resumen.ultima_ejecucion_etl || 'Ninguna';
+
+        // Render charts
+        renderChartRiesgo(data.grafica_riesgo);
+        renderChartDiagnosticos(data.grafica_diagnosticos);
+        renderChartIMCEdad(data.grafica_imc_edad);
+        renderChartGlucosaPresion(data.grafica_glucosa_presion);
+        renderChartETLTendencia(data.grafica_etl_tendencia);
+
+        // Cargar y renderizar alertas
+        loadAlertasChart();
+
+    } catch (err) {
+        console.error('Dashboard load error:', err);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function loadAlertasChart() {
+    try {
+        const resp = await apiFetch('/api/analytics/alertas/');
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        // Contar por nivel de urgencia (normalizado del backend)
+        const niveles = { Crítico: 0, Alto: 0, Medio: 0 };
+        const normalizar = { 'critica': 'Crítico', 'alta': 'Alto', 'media': 'Medio' };
+        for (const a of data.alertas || []) {
+            const n = normalizar[a.nivel_urgencia];
+            if (n in niveles) niveles[n]++;
+        }
+
+        const labels = Object.keys(niveles);
+        const values = Object.values(niveles);
+        const colors = ['#dc3545', '#fd7e14', '#ffc107'];
+
+        renderChartAlertas(labels, values, colors);
+    } catch (err) {
+        console.error('Alertas chart error:', err);
+    }
+}
+
+function renderChartAlertas(labels, values, colors) {
+    const ctx = document.getElementById('chartAlertas').getContext('2d');
+    if (chartAlertas) chartAlertas.destroy();
+    chartAlertas = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+        }
+    });
+}
+
+// ── Chart Rendering Functions ─────────────────────────────────────────────────
+
+function renderChartRiesgo(datos) {
+    const ctx = document.getElementById('chartRiesgo').getContext('2d');
+    if (chartRiesgo) chartRiesgo.destroy();
+
+    const colors = { 'Bajo': '#198754', 'Medio': '#ffc107', 'Alto': '#fd7e14', 'Crítico': '#dc3545', 'Sin dato': '#6c757d' };
+    const bgColors = datos.labels.map(l => colors[l] || '#6c757d');
+
+    chartRiesgo = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                data: datos.data,
+                backgroundColor: bgColors,
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+        }
+    });
+}
+
+function renderChartDiagnosticos(datos) {
+    const ctx = document.getElementById('chartDiagnosticos').getContext('2d');
+    if (chartDiagnosticos) chartDiagnosticos.destroy();
+
+    chartDiagnosticos = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Pacientes',
+                data: datos.data,
+                backgroundColor: '#0d6efd',
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true } }
+        }
+    });
+}
+
+function renderChartIMCEdad(datos) {
+    const ctx = document.getElementById('chartIMCEdad').getContext('2d');
+    if (chartIMCEdad) chartIMCEdad.destroy();
+
+    chartIMCEdad = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'IMC Promedio',
+                data: datos.data,
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13,110,253,0.1)',
+                fill: true,
+                tension: 0.4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'IMC' } },
+                x: { title: { display: true, text: 'Grupo Etario' } }
+            }
+        }
+    });
+}
+
+function renderChartGlucosaPresion(datos) {
+    const ctx = document.getElementById('chartGlucosaPresion').getContext('2d');
+    if (chartGlucosaPresion) chartGlucosaPresion.destroy();
+
+    chartGlucosaPresion = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Pacientes',
+                data: datos.datasets[0].data,
+                backgroundColor: 'rgba(220,53,69,0.5)',
+                pointRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { title: { display: true, text: 'Glucosa (mg/dL)' } },
+                y: { title: { display: true, text: 'Presión Sistólica (mmHg)' } }
+            }
+        }
+    });
+}
+
+function renderChartETLTendencia(datos) {
+    const ctx = document.getElementById('chartETLTendencia').getContext('2d');
+    if (chartETLTendencia) chartETLTendencia.destroy();
+
+    chartETLTendencia = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Quality Score',
+                data: datos.datasets[0].data,
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25,135,84,0.15)',
+                fill: true,
+                tension: 0.4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, max: 100, title: { display: true, text: 'Quality Score (%)' } },
+                x: { title: { display: true, text: 'Ejecución ETL' } }
+            }
+        }
+    });
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', loadDashboard);
+
+// Fade-in on scroll
+const revealEls = Array.from(document.querySelectorAll('.reveal'));
+const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+        if (e.isIntersecting) {
+            e.target.classList.add('is-visible');
+            io.unobserve(e.target);
+        }
+    }
+}, { threshold: 0.12 });
+revealEls.forEach(el => io.observe(el));
+</script>
+{% endblock %}

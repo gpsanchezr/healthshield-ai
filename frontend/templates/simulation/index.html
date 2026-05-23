@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Simulador Live — HealthShield AI{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Simulador Live</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-lightning-charge text-warning me-2"></i>Simulador Live de Pacientes</h4>
+</div>
+
+<!-- Control panel -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card p-3">
+            <label class="form-label small text-muted">Registros a generar</label>
+            <input type="number" id="simCount" class="form-control" value="50" min="1" max="500">
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card p-3">
+            <label class="form-label small text-muted">Velocidad (ms entre registros)</label>
+            <input type="number" id="simDelay" class="form-control" value="2000" min="500" max="10000">
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card p-3">
+            <label class="form-label small text-muted">&nbsp;</label>
+            <div class="d-grid gap-2">
+                <button class="btn btn-success" id="btnStartSim" onclick="startSimulation()">
+                    <i class="bi bi-play-fill"></i> Iniciar Simulación
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card p-3">
+            <label class="form-label small text-muted">&nbsp;</label>
+            <div class="d-grid gap-2">
+                <button class="btn btn-danger" id="btnStopSim" onclick="stopSimulation()" disabled>
+                    <i class="bi bi-stop-fill"></i> Detener
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Live feed -->
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card metric-card">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Feed en Vivo — Últimas Predicciones</h6>
+                <span class="badge bg-primary" id="simStatusBadge">Detenido</span>
+            </div>
+            <div class="card-body p-0">
+                <div id="liveFeed" style="max-height:400px;overflow-y:auto;">
+                    <table class="table table-sm table-hover small mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Paciente</th>
+                                <th>IMC</th>
+                                <th>Glucosa</th>
+                                <th>Presión</li>
+                                <th>Riesgo</th>
+                                <th>Tiempo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="liveFeedBody">
+                            <tr><td colspan="6" class="text-center text-muted py-4">Sin datos — inicia la simulación</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Stats -->
+        <div class="card metric-card mb-4">
+            <div class="card-header bg-transparent"><h6 class="mb-0">Estadísticas en Vivo</h6></div>
+            <div class="card-body">
+                <table class="table table-sm small mb-0">
+                    <tr><td>Registros procesados</td><td id="statProcessed">0</td></tr>
+                    <tr><td>Errores</td><td id="statErrors">0</td></tr>
+                    <tr><td>Quality Score promedio</td><td id="statQS">—</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Distribución de riesgo en vivo -->
+        <div class="card metric-card">
+            <div class="card-header bg-transparent"><h6 class="mb-0">Distribución de Riesgo</h6></div>
+            <div class="card-body chart-container">
+                <canvas id="chartLiveRiesgo"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+let simInterval = null;
+let totalProcessed = 0, totalErrors = 0;
+let qsSum = 0, qsCount = 0;
+const riesgoCounts = { Bajo: 0, Medio: 0, Alto: 0, Crítico: 0 };
+let chartLiveRiesgo = null;
+
+const RISK_COLORS = { 'Bajo': '#198754', 'Medio': '#ffc107', 'Alto': '#fd7e14', 'Crítico': '#dc3545' };
+
+function startSimulation() {
+    const count = parseInt(document.getElementById('simCount').value) || 50;
+    const delay = parseInt(document.getElementById('simDelay').value) || 2000;
+
+    document.getElementById('btnStartSim').disabled = true;
+    document.getElementById('btnStopSim').disabled = false;
+    document.getElementById('simStatusBadge').textContent = 'Ejecutando...';
+    document.getElementById('simStatusBadge').className = 'badge bg-success';
+
+    // Limpiar feed
+    document.getElementById('liveFeedBody').innerHTML = '';
+
+    let generated = 0;
+    simInterval = setInterval(async () => {
+        if (generated >= count) { stopSimulation(); return; }
+        generated++;
+        await simulateOne();
+    }, delay);
+}
+
+function stopSimulation() {
+    clearInterval(simInterval);
+    simInterval = null;
+    document.getElementById('btnStartSim').disabled = false;
+    document.getElementById('btnStopSim').disabled = true;
+    document.getElementById('simStatusBadge').textContent = 'Detenido';
+    document.getElementById('simStatusBadge').className = 'badge bg-secondary';
+}
+
+async function simulateOne() {
+    try {
+        const resp = await apiFetch('/api/etl/simular/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ count: 1 }),
+        });
+        const data = await resp.json();
+
+        totalProcessed++;
+        if (data.report && data.report.quality_score !== undefined) {
+            qsSum += data.report.quality_score;
+            qsCount++;
+        }
+
+        document.getElementById('statProcessed').textContent = totalProcessed;
+        document.getElementById('statQS').textContent = qsCount > 0 ? (qsSum / qsCount).toFixed(1) : '—';
+
+        addFeedRow(data);
+        updateLiveChart();
+    } catch (e) {
+        totalErrors++;
+        document.getElementById('statErrors').textContent = totalErrors;
+    }
+}
+
+function addFeedRow(data) {
+    const tbody = document.getElementById('liveFeedBody');
+    const firstRow = tbody.querySelector('td[colspan]');
+    if (firstRow) tbody.innerHTML = '';
+
+    // Intentar extraer riesgo del resultado
+    let riesgo = '—', imc = '—', glucosa = '—', presion = '—', nombre = 'Paciente Sim';
+
+    // También podemos intentar predecir con los datos simulados
+    const body = tbody.insertRow();
+    body.innerHTML = `
+        <td>${nombre}</td>
+        <td>${imc}</td>
+        <td>${glucosa}</td>
+        <td>${presion}</td>
+        <td><span class="badge bg-secondary">Ejecutando ETL...</span></td>
+        <td><small class="text-muted">ahora</small></td>
+    `;
+    body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function updateLiveChart() {
+    const ctx = document.getElementById('chartLiveRiesgo').getContext('2d');
+    if (!chartLiveRiesgo) {
+        chartLiveRiesgo = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(riesgoCounts),
+                datasets: [{ data: Object.values(riesgoCounts), backgroundColor: Object.values(RISK_COLORS), borderWidth: 0 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        });
+    } else {
+        chartLiveRiesgo.data.datasets[0].data = Object.values(riesgoCounts);
+        chartLiveRiesgo.update('none');
+    }
+}
+</script>
+{% endblock %}

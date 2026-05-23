@@ -1,0 +1,35 @@
+# HealthShield AI — Backend Dependencies (desarrollo local sin PostgreSQL)
+# Python 3.12+
+
+# ── Framework ─────────────────────────────────────────────────────────────────
+Django==5.0.6
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.4.0
+drf-spectacular==0.27.2
+
+# ── Base de Datos ─────────────────────────���───────────────────────────────────
+dj-database-url==2.2.0            # DATABASE_URL env parsing (solo lectura)
+
+# ── ETL & Data ────────────────────────────────────────────────────────────────
+pandas==2.2.2
+numpy==1.26.4
+openpyxl==3.1.4
+xlrd==2.0.1
+
+# ── Machine Learning ──────────────────────────────────────────────────────────
+scikit-learn==1.5.0
+joblib==1.4.2
+
+# ── Exportación de Reportes ───────────────────────────────────────────────────
+reportlab==4.2.2
+XlsxWriter==3.2.0
+
+# ── Seguridad ─────────────────────────────────────────────────────────────────
+python-decouple==3.8
+django-filter==24.2
+
+# ── Testing ────────────────────────────────────────────���──────────────────────
+pytest==8.2.2
+pytest-django==4.8.0
+pytest-cov==5.0.0

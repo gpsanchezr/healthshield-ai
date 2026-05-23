@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}ML - Predicciones - HealthShield AI{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Predicciones ML</li>{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="h3 mb-4"><i class="bi bi-brain"></i> Motor de Machine Learning</h1>
+
+    <div class="row g-4 mb-4">
+        <!-- Modelo Activo -->
+        <div class="col-lg-4">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="bi bi-gear"></i> Modelo Activo</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Algoritmo:</strong> <span id="modelo-algo" class="badge bg-info">-</span></p>
+                    <p class="mb-2"><strong>Accuracy:</strong> <span id="modelo-acc">-</span></p>
+                    <p class="mb-2"><strong>Precisión:</strong> <span id="modelo-prec">-</span></p>
+                    <p class="mb-2"><strong>Recall:</strong> <span id="modelo-rec">-</span></p>
+                    <p class="mb-0"><strong>F1-Score:</strong> <span id="modelo-f1">-</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Últimas Predicciones -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-lightning-charge"></i> Últimas Predicciones</h6>
+                </div>
+                <div class="card-body">
+                    <div id="prediccionesRecientes">
+                        <p class="text-muted text-center">Cargando...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico: Feature Importance (XAI) -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Factores de Riesgo Principales (XAI)</h6>
+        </div>
+        <div class="card-body">
+            <canvas id="featureImportanceChart" height="80"></canvas>
+        </div>
+    </div>
+
+    <!-- Gráfico: Matriz de Confusión -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-table"></i> Matriz de Confusión</h6>
+        </div>
+        <div class="card-body">
+            <canvas id="confusionMatrixChart" height="80"></canvas>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// Cargar modelo activo
+fetch('/api/ml/models/active/', {
+    headers: {'Authorization': `Bearer ${localStorage.getItem('token')}`}
+})
+.then(r => r.json())
+.then(model => {
+    if (model && model.id) {
+        document.getElementById('modelo-algo').textContent = model.algoritmo;
+        document.getElementById('modelo-acc').textContent = (model.accuracy * 100).toFixed(2) + '%';
+        document.getElementById('modelo-prec').textContent = (model.precision_score * 100).toFixed(2) + '%';
+        document.getElementById('modelo-rec').textContent = (model.recall * 100).toFixed(2) + '%';
+        document.getElementById('modelo-f1').textContent = (model.f1_score * 100).toFixed(2) + '%';
+    }
+});
+
+// Feature Importance Chart
+const ctxFeature = document.getElementById('featureImportanceChart');
+new Chart(ctxFeature, {
+    type: 'barH',
+    data: {
+        labels: ['IMC', 'Glucosa', 'Presión Sistólica', 'Edad', 'Frecuencia Cardíaca', 'Colesterol'],
+        datasets: [{
+            label: 'Importancia',
+            data: [0.32, 0.28, 0.18, 0.12, 0.06, 0.04],
+            backgroundColor: '#0d6efd'
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, max: 1 } }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1 @@
+# Reports usa serializers placeholder para drf-spectacular.

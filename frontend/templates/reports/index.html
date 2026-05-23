@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Reportes - HealthShield AI{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Reportes</li>{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="h3 mb-4"><i class="bi bi-file-earmark-pdf"></i> Generador de Reportes</h1>
+
+    <div class="row g-4 mb-4">
+        <!-- Opciones de Reporte -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Tipo de Reporte</h6>
+                </div>
+                <div class="card-body">
+                    <div class="form-group mb-3">
+                        <label class="form-label">Seleccionar tipo:</label>
+                        <select id="reportType" class="form-control">
+                            <option value="clinical_summary">Resumen Clínico General</option>
+                            <option value="etl_quality">Calidad de Datos ETL</option>
+                            <option value="ml_metrics">Métricas de ML</option>
+                            <option value="patient_risk">Pacientes de Riesgo</option>
+                        </select>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="form-label">Formato:</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="format" id="pdf" value="pdf" checked>
+                            <label class="btn btn-outline-primary" for="pdf">
+                                <i class="bi bi-file-pdf"></i> PDF
+                            </label>
+                            <input type="radio" class="btn-check" name="format" id="excel" value="excel">
+                            <label class="btn btn-outline-success" for="excel">
+                                <i class="bi bi-file-earmark-excel"></i> Excel
+                            </label>
+                            <input type="radio" class="btn-check" name="format" id="csv" value="csv">
+                            <label class="btn btn-outline-info" for="csv">
+                                <i class="bi bi-file-text"></i> CSV
+                            </label>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100" onclick="generateReport()">
+                        <i class="bi bi-download"></i> Generar Reporte
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista Previa -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Vista Previa</h6>
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    <div id="reportPreview" class="text-muted text-center py-5">
+                        Selecciona un tipo de reporte para ver la vista previa
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial de Reportes Generados -->
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-clock-history"></i> Historial de Reportes</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="reportsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Formato</th>
+                        <th>Generado por</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="5" class="text-center py-4">No hay reportes generados</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function generateReport() {
+    const type = document.getElementById('reportType').value;
+    const format = document.querySelector('input[name="format"]:checked').value;
+    
+    fetch(`/api/reports/generate/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ type, format })
+    })
+    .then(r => {
+        if (r.ok) {
+            r.blob().then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `reporte_${type}_${new Date().toISOString()}.${format}`;
+                a.click();
+            });
+        }
+    })
+    .catch(e => alert('Error generando reporte: ' + e.message));
+}
+</script>
+{% endblock %}

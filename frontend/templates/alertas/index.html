@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Alertas — HealthShield AI{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Alertas</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">Sistema de Alertas Proactivas</h4>
+    <button class="btn btn-danger btn-sm" onclick="detectarCriticos()">
+        <i class="bi bi-search"></i> Detectar Pacientes Críticos
+    </button>
+</div>
+
+<!-- Filtros -->
+<div class="row g-3 mb-4">
+    <div class="col-auto">
+        <select id="filtroUrgencia" class="form-select" onchange="filtrarAlertas()">
+            <option value="">Todos los niveles</option>
+            <option value="critica">Crítico</option>
+            <option value="alta">Alto</option>
+            <option value="media">Medio</option>
+            <option value="baja">Baja</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <select id="filtroEstado" class="form-select" onchange="filtrarAlertas()">
+            <option value="">Todas</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="vista">Vista</option>
+        </select>
+    </div>
+</div>
+
+<!-- Lista de alertas -->
+<div id="alertasList" class="row g-3">
+    <div class="col-12 text-center text-muted py-5">
+        <i class="bi bi-bell-slash fs-1 d-block mb-3"></i>
+        Cargando alertas...
+    </div>
+</div>
+
+<!-- Paginación简易 -->
+<div class="d-flex justify-content-center mt-4" id="paginationArea"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const URGENCIA_STYLE = {
+    'critica': { cls: 'alert-critical', icon: 'bi-cone-striped', badge: 'bg-danger' },
+    'alta':    { cls: 'alert-high',    icon: 'bi-exclamation-triangle', badge: 'bg-warning' },
+    'media':   { cls: 'alert-medium',  icon: 'bi-info-circle', badge: 'bg-info' },
+    'baja':    { cls: '',              icon: 'bi-info-circle', badge: 'bg-secondary' },
+};
+
+async function loadAlertas() {
+    showLoading();
+    try {
+        const urgencia = document.getElementById('filtroUrgencia').value;
+        const estado = document.getElementById('filtroEstado').value;
+        let url = '/api/analytics/alertas/';
+        const params = [];
+        if (urgencia) params.push(`urgencia=${urgencia}`);
+        if (params.length) url += '?' + params.join('&');
+
+        const resp = await apiFetch(url);
+        if (!resp.ok) throw new Error();
+        const data = await resp.json();
+
+        let alertas = data.alertas || [];
+        if (estado === 'pendiente') alertas = alertas.filter(a => !a.fecha_vista);
+        if (estado === 'vista') alertas = alertas.filter(a => a.fecha_vista);
+
+        renderAlertas(alertas);
+        updateBadge(data.total);
+    } catch {
+        document.getElementById('alertasList').innerHTML =
+            '<div class="col-12 text-center text-danger py-5">Error cargando alertas</div>';
+    } finally {
+        hideLoading();
+    }
+}
+
+function filtrarAlertas() { loadAlertas(); }
+
+function renderAlertas(alertas) {
+    const container = document.getElementById('alertasList');
+    if (!alertas.length) {
+        container.innerHTML = `<div class="col-12 text-center text-muted py-5">
+            <i class="bi bi-check-circle fs-1 d-block mb-3"></i>No hay alertas
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = alertas.map(a => {
+        const style = URGENCIA_STYLE[a.nivel_urgencia] || URGENCIA_STYLE.baja;
+        const timeAgo = timeSince(new Date(a.fecha_alerta));
+        return `
+        <div class="col-md-6 col-lg-4">
+            <div class="card metric-card border-start border-4 ${style.cls.includes('alert-') ? '' : 'border-secondary'}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge ${style.badge}">${a.nivel_urgencia.toUpperCase()}</span>
+                        <small class="text-muted">${timeAgo}</small>
+                    </div>
+                    <h6 class="card-title mb-1">
+                        <i class="${style.icon} me-1"></i>${a.tipo_alerta}
+                    </h6>
+                    <p class="small mb-2">${a.descripcion}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">📋 ${a.paciente_nombre}</small>
+                        ${!a.fecha_vista
+                            ? `<button class="btn btn-sm btn-outline-light" onclick="marcarVista(${a.id})">Marcar vista</button>`
+                            : `<small class="text-success"><i class="bi bi-check"></i> Vista</small>`
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateBadge(total) {
+    const badge = document.getElementById('alertaBadge');
+    if (badge) {
+        badge.textContent = total;
+        badge.style.display = total > 0 ? 'inline' : 'none';
+    }
+}
+
+async function marcarVista(id) {
+    const resp = await apiFetch(`/api/analytics/alertas/${id}/`, { method: 'POST' });
+    if (resp.ok) loadAlertas();
+}
+
+async function detectarCriticos() {
+    showLoading();
+    try {
+        const resp = await apiFetch('/api/analytics/detectar-criticos/', { method: 'POST' });
+        const data = await resp.json();
+        hideLoading();
+        if (resp.ok) {
+            alert(`✅ Se generaron ${data.alertas_generadas} alertas de pacientes críticos.`);
+            loadAlertas();
+        } else {
+            alert('❌ Error detectando críticos');
+        }
+    } catch {
+        hideLoading();
+        alert('❌ Error de conexión');
+    }
+}
+
+function timeSince(date) {
+    const secs = Math.floor((new Date() - date) / 1000);
+    if (secs < 60) return 'justo ahora';
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `hace ${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `hace ${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    return `hace ${days}d`;
+}
+
+document.addEventListener('DOMContentLoaded', loadAlertas);
+</script>
+{% endblock %}

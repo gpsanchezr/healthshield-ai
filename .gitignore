@@ -1,0 +1,63 @@
+# =============================
+# Django / Python
+# =============================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# Test / tooling cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Django
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Env files (never commit)
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+
+# Build / distribution artifacts (Python)
+dist/
+build/
+*.egg-info/
+
+# =============================
+# ML artifacts
+# =============================
+ml_models/
+backend/ml_models/
+
+# =============================
+# Frontend (if build outputs are generated)
+# (Tu proyecto usa templates/statics versionados; ignoramos lo típico de build)
+frontend/node_modules/
+frontend/dist/
+
+# =============================
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =============================
+# Docker
+# (no ignoramos Dockerfile/entrypoint; solo runtime volumes/overrides)
+*.tar
+

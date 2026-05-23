@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pacientes - HealthShield AI{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Pacientes</li>{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3"><i class="bi bi-people-fill"></i> Registro de Pacientes</h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPatientModal">
+                    <i class="bi bi-plus-circle"></i> Nuevo Paciente
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <input type="text" id="searchPacientes" class="form-control" placeholder="🔍 Buscar por nombre...">
+        </div>
+        <div class="col-md-4">
+            <select id="filterRiesgo" class="form-control">
+                <option value="">Todos los riesgos</option>
+                <option value="Bajo">Bajo</option>
+                <option value="Medio">Medio</option>
+                <option value="Alto">Alto</option>
+                <option value="Crítico">Crítico</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Tabla de Pacientes -->
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="pacientesTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Edad</th>
+                        <th>Sexo</th>
+                        <th>IMC</th>
+                        <th>Riesgo</th>
+                        <th>Registros</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="pacientesBody">
+                    <tr><td colspan="8" class="text-center py-5"><i class="bi bi-hourglass-split"></i> Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Nuevo Paciente -->
+<div class="modal fade" id="newPatientModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Nuevo Paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newPatientForm">
+                <div class="modal-body">
+                    <div class="form-group mb-3">
+                        <label class="form-label">Nombres</label>
+                        <input type="text" class="form-control" name="nombres" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="form-label">Apellidos</label>
+                        <input type="text" class="form-control" name="apellidos" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Edad</label>
+                            <input type="number" class="form-control" name="edad" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Sexo</label>
+                            <select class="form-control" name="sexo" required>
+                                <option value="M">Masculino</option>
+                                <option value="F">Femenino</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+fetch('/api/pacientes/', {
+    headers: {'Authorization': `Bearer ${localStorage.getItem('token')}`}
+})
+.then(r => r.json())
+.then(data => {
+    const tbody = document.getElementById('pacientesBody');
+    tbody.innerHTML = '';
+    if (data.results && data.results.length > 0) {
+        data.results.forEach(p => {
+            const riskColor = {
+                'Bajo': 'success', 'Medio': 'warning', 
+                'Alto': 'danger', 'Crítico': 'dark'
+            }[p.registros?.[0]?.riesgo_enfermedad] || 'secondary';
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td><code>${p.id}</code></td>
+                    <td>${p.nombres} ${p.apellidos}</td>
+                    <td>${p.edad} años</td>
+                    <td>${p.sexo === 'M' ? '👨' : '👩'}</td>
+                    <td>${p.registros?.[0]?.imc.toFixed(1) || '-'}</td>
+                    <td><span class="badge bg-${riskColor}">${p.registros?.[0]?.riesgo_enfermedad || '-'}</span></td>
+                    <td><span class="badge bg-info">${p.total_registros}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewPatient(${p.id})">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    } else {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">Sin pacientes registrados</td></tr>';
+    }
+});
+
+function viewPatient(id) {
+    window.location.href = `/pacientes/${id}/`;
+}
+</script>
+{% endblock %}

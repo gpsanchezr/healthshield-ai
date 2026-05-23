@@ -1,0 +1,1 @@
+# No hay modelos propios — dashboard consume modelos de otras apps vía service layer.

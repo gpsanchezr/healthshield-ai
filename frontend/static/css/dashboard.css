@@ -1,0 +1,140 @@
+/* HealthShield AI — Dashboard UX/UI (Glassmorphism + animaciones)
+   Bootstrap se mantiene; este CSS añade identidad clínica.
+*/
+
+:root{
+  --hs-bg0: #f7fbff;
+  --hs-bg1: #eff6ff;
+
+  --hs-primary: #0d6efd;
+  --hs-cyan: #00d4ff;
+  --hs-success: #198754;
+  --hs-warning: #ffc107;
+  --hs-danger: #dc3545;
+
+  --hs-text: rgba(13, 19, 33, 0.92);
+  --hs-muted: rgba(13, 19, 33, 0.58);
+
+  --hs-glass-bg: rgba(255, 255, 255, 0.18);
+  --hs-glass-bg-strong: rgba(255, 255, 255, 0.26);
+  --hs-glass-border: rgba(255, 255, 255, 0.28);
+
+  --hs-shadow: 0 18px 60px rgba(13, 110, 253, 0.10);
+  --hs-shadow-2: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+  --hs-radius: 16px;
+}
+
+/* Fondo clínico (del dashboard) */
+#dashboard-root{
+  min-height: calc(100vh - 96px);
+  position: relative;
+  overflow: hidden;
+}
+
+#dashboard-root::before{
+  content: "";
+  position: absolute;
+  inset: -120px -120px auto -120px;
+  height: 520px;
+  background:
+    radial-gradient(900px 360px at 15% 20%, rgba(0, 212, 255, 0.35), transparent 60%),
+    radial-gradient(700px 320px at 85% 15%, rgba(13, 110, 253, 0.25), transparent 55%),
+    radial-gradient(540px 260px at 55% 75%, rgba(25, 135, 84, 0.15), transparent 60%);
+  pointer-events: none;
+}
+
+#dashboard-root::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.65) 0%, rgba(247,251,255,0.85) 100%);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+[data-bs-theme="dark"] #dashboard-root::after{
+  background:
+    linear-gradient(180deg, rgba(15,15,26,0.55) 0%, rgba(10,12,20,0.9) 100%);
+  opacity: 1;
+}
+
+/* Tarjetas: glassmorphism */
+.metric-card{
+  background: var(--hs-glass-bg);
+  border: 1px solid var(--hs-glass-border);
+  border-radius: var(--hs-radius);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--hs-shadow-2);
+  position: relative;
+  overflow: hidden;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, background 220ms ease;
+}
+
+.metric-card::before{
+  content: "";
+  position: absolute;
+  top: -1px; left: -1px; right: -1px;
+  height: 54px;
+  background: linear-gradient(90deg, rgba(0,212,255,0.25), rgba(13,110,253,0.20), rgba(25,135,84,0.15));
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.metric-card:hover{
+  transform: translateY(-6px);
+  box-shadow: var(--hs-shadow);
+  border-color: rgba(0, 212, 255, 0.42);
+  background: var(--hs-glass-bg-strong);
+}
+
+/* Asegura texto legible sobre vidrio */
+.metric-card .card-header h6,
+.metric-card p,
+.metric-card small,
+.metric-card h3{
+  color: var(--hs-text);
+}
+
+.metric-card .text-muted{ color: var(--hs-muted) !important; }
+
+/* Contenedor de charts */
+.chart-container{
+  position: relative;
+  height: 280px;
+}
+
+/* Animación fade-in al cargar */
+.reveal{
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 650ms ease, transform 650ms ease;
+}
+
+.reveal.is-visible{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Subida al hover para contenedores */
+.reveal-hover{
+  transition: transform 220ms ease;
+}
+
+.reveal-hover:hover{
+  transform: translateY(-4px);
+}
+
+/* Mejorar canvas visual */
+.metric-card canvas{
+  filter: drop-shadow(0 10px 18px rgba(13,110,253,0.08));
+}
+
+/* Reduce motion para accesibilidad */
+@media (prefers-reduced-motion: reduce){
+  .metric-card{ transition: none !important; }
+  .reveal{ transition: none !important; opacity: 1; transform: none; }
+}
+
