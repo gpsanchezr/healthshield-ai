@@ -151,7 +151,6 @@ class DiagnosisNormalizer(BaseTransformer):
         'hipertension': 'Hipertensión',
         'diabetes tipo 2': 'Diabetes Tipo 2',
         'diabetes tipo ii': 'Diabetes Tipo 2',
-        'diabetes tipo ii': 'Diabetes Tipo 2',
         'diabetes tipo i': 'Diabetes Tipo 1',
         'diabetes mellitus tipo 2': 'Diabetes Tipo 2',
         'diabetes mellitus': 'Diabetes Tipo 2',
@@ -161,13 +160,10 @@ class DiagnosisNormalizer(BaseTransformer):
         for col in ['diagnostico_preliminar', 'diagnóstico_preliminar']:
             if col in df.columns:
                 original = df[col].astype(str).str.strip()
-                normalized = original.str.lower()
-                normalized = normalized.replace(self.NORMALIZATION_MAP)
-                normalized = normalized.str.title().replace({
-                    'Hipertension': 'Hipertensión',
-                    'Diabetes Tipo 2': 'Diabetes Tipo 2',
-                    'Diabetes Tipo 1': 'Diabetes Tipo 1',
-                })
+                normalized = original.str.lower().replace(self.NORMALIZATION_MAP)
+                normalized = normalized.map(
+                    lambda value: self.NORMALIZATION_MAP.get(value, value.title())
+                )
                 df[col] = normalized
 
                 if self.qr:
