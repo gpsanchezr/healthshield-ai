@@ -37,6 +37,7 @@ docker-compose up --build
 make install     # instala dependencias
 make run         # levanta el servidor Django local
 make test        # ejecuta pytest
+python run_tests.py # ejecuta pytest usando el runner de proyecto
 make etl         # ejecuta ETL con el comando Django
 make docker-up   # levanta stack Docker (pendiente)
 make clean       # limpia caches temporales

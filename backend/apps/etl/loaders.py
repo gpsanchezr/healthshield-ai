@@ -23,6 +23,9 @@ class DatabaseLoader:
         # Columnas que el ETL produce
         df['sexo'] = df.get('sexo')
 
+        # Convertir todos los valores NaN/NaT a None para compatibilidad segura con el ORM de Django
+        df = df.where(pd.notnull(df), None)
+
         for _, row in df.iterrows():
             paciente, _ = Paciente.objects.get_or_create(
                 id_paciente_original=int(row['id_paciente']),
@@ -59,4 +62,3 @@ class DatabaseLoader:
             registros_insertados += 1
 
         return registros_insertados
-

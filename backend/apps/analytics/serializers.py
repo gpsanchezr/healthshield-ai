@@ -33,3 +33,4 @@ class KPICalculatorResultSerializer(serializers.Serializer):
     presion_sistolica_promedio = serializers.FloatField()
     alertas_activas = serializers.IntegerField()
     ultima_ejecucion_etl = serializers.CharField(allow_null=True)
+    estadisticas_descriptivas = serializers.DictField(child=serializers.DictField(), required=False)

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import DashboardSummaryView, dashboard_home_view
+from .views import DashboardSummaryView, DashboardCorrelationView, dashboard_home_view
 
 urlpatterns = [
     # HTML page (template): frontend/templates/dashboard/index.html
@@ -8,5 +8,6 @@ urlpatterns = [
 
     # JSON API for the dashboard charts
     path('api/dashboard/', DashboardSummaryView.as_view(), name='dashboard_summary'),
+    path('api/dashboard/correlacion/', DashboardCorrelationView.as_view(), name='dashboard_correlation'),
 ]
 

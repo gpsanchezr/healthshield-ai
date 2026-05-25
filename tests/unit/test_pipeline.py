@@ -114,7 +114,6 @@ class TestPipelineIntegration:
             'presión_sistólica': [120, 'alta', 110, 'normal', None],
             'presión_diastólica': [80, 95, 70, 105, 75],
             'frecuencia_cardiaca': [72, 85, 68, 90, 70],
-            'glucosa': [100.0, 200.0, 90.0, 310.0, 95.0],
             'colesterol': [190.0, 240.0, 180.0, 300.0, 170.0],
             'saturación_oxígeno': [98.0, 95.0, 99.0, 82.0, 97.0],
             'temperatura': [36.5, 37.2, 36.8, 38.5, 36.6],

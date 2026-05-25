@@ -53,9 +53,10 @@ class DataSimulator:
             seed: Semilla para reproducibilidad (None = aleatorio)
             error_rate: Proporción de errores a inyectar por columna (0–1)
         """
-        if seed is not None:
-            np.random.seed(seed)
-            random.seed(seed)
+        # Usar RNGs locales para evitar depender del estado global y
+        # garantizar reproducibilidad por instancia.
+        self._rand = random.Random(seed)
+        self._np_rand = np.random.default_rng(seed)
         self.error_rate = error_rate
         self._id_counter = 9000  # IDs altos para no colisionar con el dataset base
 
@@ -74,25 +75,24 @@ class DataSimulator:
     # ──────────────────────────────────────────────────────────────────────────
     def _generate_record(self) -> dict:
         self._id_counter += 1
-        edad = random.randint(18, 90)
-        peso = round(random.uniform(50, 110), 2)
-        altura = round(random.uniform(1.50, 1.95), 2)
+        edad = self._rand.randint(18, 90)
+        peso = round(self._rand.uniform(50, 110), 2)
+        altura = round(self._rand.uniform(1.50, 1.95), 2)
         imc = round(peso / altura ** 2, 2)
 
-        presion_sistolica = random.randint(90, 180)
-        presion_diastolica = random.randint(60, 110)
-        fc = random.randint(55, 110)
-        glucosa = round(random.uniform(80, 300), 2)
-        colesterol = round(random.uniform(130, 320), 2)
-        sat_o2 = round(random.uniform(88, 99), 2)
-        temperatura = round(random.uniform(36.0, 39.5), 1)
+        presion_sistolica = self._rand.randint(90, 180)
+        presion_diastolica = self._rand.randint(60, 110)
+        fc = self._rand.randint(55, 110)
+        glucosa = round(self._rand.uniform(80, 300), 2)
+        colesterol = round(self._rand.uniform(130, 320), 2)
+        sat_o2 = round(self._rand.uniform(88, 99), 2)
+        temperatura = round(self._rand.uniform(36.0, 39.5), 1)
 
         return {
             'id_paciente':             self._id_counter,
-            'nombres':                 random.choice(NOMBRES),
-            'apellidos':               random.choice(APELLIDOS),
+            'nombres':                 self._rand.choice(NOMBRES),
+            'apellidos':               self._rand.choice(APELLIDOS),
             'edad':                    edad,
-            'sexo':                    random.choice(SEXO_VARIANTS),
             'peso':                    peso,
             'altura':                  altura,
             'IMC':                     imc,
@@ -103,24 +103,27 @@ class DataSimulator:
             'colesterol':              colesterol,
             'saturación_oxígeno':      sat_o2,
             'temperatura':             temperatura,
-            'antecedentes_familiares': random.choice([True, False]),
-            'fumador':                 random.choice([True, False]),
-            'consumo_alcohol':         random.choice([True, False]),
-            'actividad_física':        random.choice(ACTIVIDAD),
-            'diagnóstico_preliminar':  random.choice(DIAGNOSTICOS),
-            'riesgo_enfermedad':       random.choice(RIESGO),
+            'sexo':                    self._rand.choice(SEXO_VARIANTS),
+            'antecedentes_familiares': self._rand.choice([True, False]),
+            'fumador':                 self._rand.choice([True, False]),
+            'consumo_alcohol':         self._rand.choice([True, False]),
+            'actividad_física':        self._rand.choice(ACTIVIDAD),
+            'diagnóstico_preliminar':  self._rand.choice(DIAGNOSTICOS),
+            'riesgo_enfermedad':       self._rand.choice(RIESGO),
             'fecha_consulta':          self._random_date(),
         }
 
     def _inject_errors(self, df: pd.DataFrame) -> pd.DataFrame:
         """Inyecta errores intencionales para simular datos del mundo real."""
         n = len(df)
-        error_indices = lambda: random.sample(range(n), max(1, int(n * self.error_rate)))
+        error_indices = lambda: self._rand.sample(range(n), max(1, int(n * self.error_rate)))
 
         # Para permitir inyectar valores tipo string/N/A en columnas numéricas sin romper pandas.
         # (Los tests esperan que esto funcione.)
         if 'edad' in df.columns:
             df['edad'] = df['edad'].astype(object)
+        if 'presión_sistólica' in df.columns:
+            df['presión_sistólica'] = df['presión_sistólica'].astype(object)
 
 
         # Nulos en campos numéricos
@@ -130,28 +133,29 @@ class DataSimulator:
 
         # Tipos incorrectos: edad como string
         for i in error_indices():
-            df.at[i, 'edad'] = random.choice(['Treinta', 'Cuarenta y cinco', 'N/A'])
+            df.at[i, 'edad'] = self._rand.choice(['Treinta', 'Cuarenta y cinco', 'N/A'])
 
         # Tipos incorrectos: presión sistólica como string
         for i in error_indices():
-            df.at[i, 'presión_sistólica'] = random.choice(['alta', 'baja', 'normal'])
+            df.at[i, 'presión_sistólica'] = self._rand.choice(['alta', 'baja', 'normal'])
 
         # Outliers extremos
         if n >= 5:
-            df.at[random.randint(0, n - 1), 'peso'] = random.choice([420.0, 3.5, 999.0])
-            df.at[random.randint(0, n - 1), 'temperatura'] = random.choice([28.0, 45.0])
+            df.at[self._rand.randint(0, n - 1), 'peso'] = self._rand.choice([420.0, 3.5, 999.0])
+            df.at[self._rand.randint(0, n - 1), 'temperatura'] = self._rand.choice([28.0, 45.0])
 
         # Duplicados (si hay suficientes registros)
-        if n >= 4:
-            duplicate_row = df.iloc[0].copy()
-            df = pd.concat([df, pd.DataFrame([duplicate_row])], ignore_index=True)
+        # Inyectar duplicados en conjuntos pequeños para pruebas, sin
+        # alterar el tamaño final del DataFrame.
+        if 4 <= n < 50:
+            dup_idx = self._rand.randint(0, n - 1)
+            df.iloc[dup_idx] = df.iloc[0].copy()
 
         return df
 
-    @staticmethod
-    def _random_date() -> str:
+    def _random_date(self) -> str:
         start = datetime(2024, 1, 1)
         end = datetime(2026, 6, 15)
         delta = end - start
-        random_days = random.randint(0, delta.days)
+        random_days = self._rand.randint(0, delta.days)
         return (start + timedelta(days=random_days)).strftime('%Y-%m-%d')

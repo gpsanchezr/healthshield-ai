@@ -8,7 +8,7 @@ from apps.authentication.permissions import EsMedico, EsAdministrador
 from apps.etl.models import Paciente, RegistroClinico
 
 from .models import ModeloML, Prediccion
-from .predictor import get_predictor
+from .predictor import ModelPredictor
 from .serializers import (
     PrediccionSerializer,
     ModeloMLSerializer,
@@ -62,12 +62,19 @@ class PredecirRiesgoView(APIView):
             'edad': paciente.edad,
         }
 
-        # Ejecutar predictor
-        predictor = get_predictor()
+        # Obtener modelo activo de manera segura
+        modelo_activo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
+        if not modelo_activo or not modelo_activo.archivo_modelo:
+            return Response(
+                {'error': 'No hay un modelo de Machine Learning activo o configurado.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # Ejecutar predictor (ModelPredictor ya carga el modelo activo internamente)
+        predictor = ModelPredictor()
         result = predictor.predict(registro_data)
 
         # Guardar predicción en BD
-        modelo_activo = ModeloML.objects.filter(activo=True).first()
         prediccion = Prediccion.objects.create(
             paciente=paciente,
             modelo=modelo_activo,
@@ -117,7 +124,7 @@ class ModeloActivoMetricsView(APIView):
     def get(self, request):
         modelo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
         if not modelo:
-            return Response({'error': 'No hay modelo activo'}, status=404)
+            return Response({'error': 'No hay modelo activo'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response({
             'nombre': modelo.nombre,
@@ -215,6 +222,13 @@ class PredecirSignosView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        predictor = get_predictor()
+        modelo_activo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
+        if not modelo_activo or not modelo_activo.archivo_modelo:
+            return Response(
+                {'error': 'No hay un modelo de Machine Learning activo.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        predictor = ModelPredictor()
         result = predictor.predict(signos)
         return Response(result, status=status.HTTP_200_OK)

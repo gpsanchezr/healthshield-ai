@@ -92,7 +92,13 @@ class ModelPredictor:
             if val is None or (isinstance(val, float) and np.isnan(val)):
                 # Medianadummy para datos faltantes
                 val = 0.0
-            values.append(float(val))
+            
+            try:
+                val = float(val)
+            except (ValueError, TypeError):
+                val = 0.0
+                
+            values.append(val)
 
         X = np.array(values).reshape(1, -1)
         return X
@@ -131,11 +137,25 @@ class ModelPredictor:
     def _mock_prediction(self, data: dict) -> dict:
         """Predicción mock cuando no hay modelo entrenado."""
         score = 0
-        if data.get('glucosa', 0) > 200:
+        # Glucosa: >200 alto, >150 moderado
+        glu = data.get('glucosa', 0) or 0
+        if glu > 200:
             score += 2
-        if data.get('presion_sistolica', 0) > 140:
+        elif glu > 150:
+            score += 1
+
+        # Presión sistólica: >140 alto, >130 moderado
+        ps = data.get('presion_sistolica', 0) or 0
+        if ps > 140:
             score += 2
-        if data.get('IMC', 0) > 30 or data.get('imc', 0) > 30:
+        elif ps > 130:
+            score += 1
+
+        # IMC: >30 alto, >25 moderado
+        imc_val = data.get('IMC', 0) or data.get('imc', 0) or 0
+        if imc_val > 30:
+            score += 2
+        elif imc_val > 25:
             score += 1
 
         if score >= 4:

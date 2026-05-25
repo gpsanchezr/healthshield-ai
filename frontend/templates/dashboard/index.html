@@ -10,6 +10,43 @@
 
 {% block content %}
 <div id="dashboard-root">
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card metric-card p-4 reveal" data-reveal>
+            <div class="d-flex flex-column flex-lg-row align-items-start justify-content-between gap-4">
+                <div class="pe-lg-4">
+                    <span class="badge status-pill status-pill-primary mb-3">ETL Data Core</span>
+                    <h2 class="mb-2">Dashboard Analítico Clínico</h2>
+                    <p class="text-muted mb-3">Visualiza tendencias de salud, calidad de datos y alertas críticas con un diseño de tablero moderno y profesional.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="status-pill status-pill-success">ETL activo</span>
+                        <span class="status-pill status-pill-warning">Simulación iniciada</span>
+                        <span class="status-pill status-pill-info">Monitor en tiempo real</span>
+                    </div>
+                </div>
+                <div class="dashboard-keystats d-flex flex-wrap gap-3 align-items-stretch">
+                    <div class="status-card p-3">
+                        <small class="text-muted">Modelo activo</small>
+                        <h5 class="mb-0" id="heroModelName">Cargando...</h5>
+                    </div>
+                    <div class="status-card p-3">
+                        <small class="text-muted">Última ETL</small>
+                        <h5 class="mb-0" id="heroLastETL">—</h5>
+                    </div>
+                    <div class="status-card p-3">
+                        <small class="text-muted">Pacientes</small>
+                        <h5 class="mb-0" id="heroTotalPacientes">—</h5>
+                    </div>
+                    <div class="status-card p-3">
+                        <small class="text-muted">Registros</small>
+                        <h5 class="mb-0" id="heroTotalRegistros">—</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- KPI Cards Row — 4 tarjetas HealthShield AI -->
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-lg-3">
@@ -127,7 +164,22 @@
     </div>
 </div>
 
-<!-- Third row: ETL trend + Alerts urgency -->
+<!-- Third row: Correlation heatmap + ETL trend + Alerts urgency -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-12">
+        <div class="card metric-card h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0">Heatmap de Correlación de Signos Vitales</h6>
+            </div>
+                    <div class="card-body chart-container">
+                        <canvas id="chartCorrelationMatrix"></canvas>
+                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fourth row: ETL trend + Alerts urgency -->
 <div class="row g-4 mb-4">
     <!-- ETL tendencia Area -->
     <div class="col-lg-6">
@@ -183,7 +235,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 // ── Charts instances ─────────────────────────────────────────────────────────
-let chartRiesgo, chartDiagnosticos, chartIMCEdad, chartGlucosaPresion, chartETLTendencia, chartAlertas;
+let chartRiesgo, chartDiagnosticos, chartIMCEdad, chartGlucosaPresion, chartETLTendencia, chartAlertas, chartCorrelationMatrix;
 
 async function loadDashboard() {
     showLoading();
@@ -193,10 +245,17 @@ async function loadDashboard() {
         const data = await resp.json();
 
         // KPI cards — 4 indicadores principales
+        document.getElementById('heroModelName').textContent = data.kpi_resumen.modelo_activo || 'Sin modelo activo';
+        document.getElementById('heroLastETL').textContent = data.kpi_resumen.ultima_ejecucion_etl || 'Ninguna';
+        document.getElementById('heroTotalPacientes').textContent =
+            (data.kpi_resumen.total_pacientes || 0).toLocaleString();
+        document.getElementById('heroTotalRegistros').textContent =
+            (data.kpi_resumen.total_registros || 0).toLocaleString();
+
         document.getElementById('kpiRiesgo').textContent =
             (data.kpi_resumen.pacientes_riesgo_alto || 0).toLocaleString();
         document.getElementById('kpiGlucosa').textContent =
-            data.kpi_resumen.promedio_glucosa || '��';
+            data.kpi_resumen.promedio_glucosa || '—';
         document.getElementById('kpiETL').textContent =
             (data.kpi_resumen.total_registros_procesados || 0).toLocaleString();
         document.getElementById('kpiAlertasCriticas').textContent =
@@ -219,6 +278,9 @@ async function loadDashboard() {
         renderChartIMCEdad(data.grafica_imc_edad);
         renderChartGlucosaPresion(data.grafica_glucosa_presion);
         renderChartETLTendencia(data.grafica_etl_tendencia);
+
+        // Cargar heatmap de correlación
+        loadCorrelationHeatmap();
 
         // Cargar y renderizar alertas
         loadAlertasChart();
@@ -411,19 +473,85 @@ function renderChartETLTendencia(datos) {
     });
 }
 
+function loadCorrelationHeatmap() {
+    apiFetch('/api/dashboard/correlacion/')
+        .then(resp => {
+            if (!resp.ok) throw new Error('No se pudo cargar correlación');
+            return resp.json();
+        })
+            .then(data => renderCorrelationHeatmap(data))
+        .catch(err => console.error('Correlation heatmap error:', err));
+}
+
+function renderCorrelationHeatmap(data) {
+    const ctx = document.getElementById('chartCorrelationMatrix').getContext('2d');
+    if (chartCorrelationMatrix) chartCorrelationMatrix.destroy();
+
+    if (!data.labels || !data.matrix || data.labels.length === 0) {
+        console.warn('No hay datos de correlación disponibles.');
+        return;
+    }
+
+    const points = [];
+    const maxLabelIndex = data.labels.length - 1;
+    data.labels.forEach((rowLabel, rowIndex) => {
+        data.labels.forEach((colLabel, colIndex) => {
+            const value = Number(data.matrix[rowLabel]?.[colLabel] ?? 0);
+            points.push({ x: colIndex, y: rowIndex, v: value, label: `${rowLabel} x ${colLabel}` });
+        });
+    });
+
+    chartCorrelationMatrix = new Chart(ctx, {
+        type: 'matrix',
+        data: {
+            datasets: [{
+                label: 'Heatmap de correlación',
+                data: points,
+                borderWidth: 1,
+                width: ({ chart }) => (chart.chartArea?.width ?? 0) / (maxLabelIndex + 1) - 6,
+                height: ({ chart }) => (chart.chartArea?.height ?? 0) / (maxLabelIndex + 1) - 6,
+                backgroundColor: context => {
+                    const value = context.dataset.data[context.dataIndex].v;
+                    const intensity = Math.round(220 - Math.abs(value) * 180);
+                    return value >= 0
+                        ? `rgba(${Math.max(40, intensity)}, 120, 255, 0.95)`
+                        : `rgba(255, ${Math.max(40, intensity)}, ${Math.max(40, intensity)}, 0.95)`;
+                },
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: data.labels,
+                    offset: true,
+                    grid: { display: false },
+                    title: { display: true, text: 'Variable' },
+                },
+                y: {
+                    type: 'category',
+                    labels: data.labels,
+                    offset: true,
+                    grid: { display: false },
+                    title: { display: true, text: 'Variable' },
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: item => item[0].raw.label,
+                        label: item => `Correlación: ${item.raw.v.toFixed(2)}`,
+                    }
+                },
+            }
+        }
+    });
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', loadDashboard);
-
-// Fade-in on scroll
-const revealEls = Array.from(document.querySelectorAll('.reveal'));
-const io = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-        if (e.isIntersecting) {
-            e.target.classList.add('is-visible');
-            io.unobserve(e.target);
-        }
-    }
-}, { threshold: 0.12 });
-revealEls.forEach(el => io.observe(el));
 </script>
 {% endblock %}

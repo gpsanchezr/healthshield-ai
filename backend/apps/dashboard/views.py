@@ -3,6 +3,8 @@ Views del Dashboard — agrega datos para las gráficas Chart.js + render HTML.
 """
 from collections import defaultdict
 
+import numpy as np
+import pandas as pd
 from django.db.models import Avg, Count
 from django.http import HttpResponse
 from django.template.loader import get_template
@@ -91,11 +93,15 @@ class DashboardSummaryView(APIView):
             f"Q={last_etl['quality_score']}"
             if last_etl else None
         )
+        riesgo_alto_count = RegistroClinico.objects.filter(riesgo_enfermedad__in=['Alto', 'Crítico']).count()
+        alertas_criticas_count = Alerta.objects.filter(nivel_urgencia='critica', fecha_vista__isnull=True).count()
 
         return Response({
             'kpi_resumen': {
                 'total_pacientes': Paciente.objects.count(),
                 'total_registros': RegistroClinico.objects.count(),
+                'total_registros_procesados': RegistroClinico.objects.count(),
+                'pacientes_riesgo_alto': riesgo_alto_count,
                 'modelo_activo': modelo.nombre if modelo else None,
                 'modelo_accuracy': modelo.accuracy if modelo else None,
                 'promedio_imc': round(float(vital_stats['imc_avg'] or 0), 2),
@@ -103,6 +109,7 @@ class DashboardSummaryView(APIView):
                 'promedio_presion_sistolica': round(float(vital_stats['ps_avg'] or 0), 2),
                 'ultima_ejecucion_etl': ultima_etl_str,
                 'alertas_activas': Alerta.objects.filter(fecha_vista__isnull=True).count(),
+                'alertas_criticas': alertas_criticas_count,
             },
             'grafica_riesgo': {
                 'labels': riesgo_labels,
@@ -116,6 +123,43 @@ class DashboardSummaryView(APIView):
             'grafica_glucosa_presion': scatter_data,
             'grafica_etl_tendencia': etl_tendencia,
         })
+
+
+class DashboardCorrelationView(APIView):
+    """GET /api/dashboard/correlacion/ — matriz de correlación de signos vitales."""
+    permission_classes = [IsAuthenticated, EsMedico]
+
+    @extend_schema(summary="Heatmap de correlación de signos vitales")
+    def get(self, request):
+        registros = (
+            RegistroClinico.objects
+            .select_related('paciente')
+            .exclude(imc__isnull=True)
+            .exclude(glucosa__isnull=True)
+            .exclude(presion_sistolica__isnull=True)
+            .exclude(presion_diastolica__isnull=True)
+            .exclude(colesterol__isnull=True)
+            .exclude(temperatura__isnull=True)
+            .exclude(frecuencia_cardiaca__isnull=True)
+            .values(
+                'imc', 'glucosa', 'presion_sistolica', 'presion_diastolica',
+                'colesterol', 'temperatura', 'frecuencia_cardiaca', 'paciente__edad',
+            )[:500]
+        )
+        df = pd.DataFrame.from_records(registros)
+        if df.empty:
+            return Response({'labels': [], 'matrix': {}})
+
+        df = df.rename(columns={'paciente__edad': 'edad'})
+        numeric_cols = [
+            'imc', 'glucosa', 'presion_sistolica', 'presion_diastolica',
+            'colesterol', 'temperatura', 'frecuencia_cardiaca', 'edad',
+        ]
+        corr = df[numeric_cols].corr(method='pearson').round(2)
+        corr = corr.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        matrix = corr.astype(float).to_dict()
+
+        return Response({'labels': numeric_cols, 'matrix': matrix})
 
     def _imc_por_grupo_etario(self) -> dict:
         """Agrupa pacientes en grupos etarios de 5 años y calcula IMC promedio."""

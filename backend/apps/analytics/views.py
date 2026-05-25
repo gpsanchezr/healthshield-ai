@@ -1,3 +1,4 @@
+import pandas as pd
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -6,6 +7,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from apps.authentication.permissions import EsMedico, EsAnalista, EsAdministrador
 from apps.etl.models import Paciente, RegistroClinico
+from django.db.models import Count, Case, When, Value, CharField, F
 
 from .models import Alerta
 from .calculators import KPICalculator, PacienteCriticoDetector
@@ -40,6 +42,7 @@ class DashboardKPIsView(APIView):
             'presion_sistolica_promedio': metrics.presion_sistolica_promedio,
             'alertas_activas': metrics.alertas_activas,
             'ultima_ejecucion_etl': metrics.ultima_ejecucion_etl,
+            'estadisticas_descriptivas': metrics.estadisticas_descriptivas,
         }
         return Response(data)
 
@@ -83,8 +86,15 @@ class PacientesSegmentacionView(APIView):
     def get(self, request):
         # Segmentación por rango de edad
         segmentos_edad = (
-            Paciente.objects
-            .values('edad_group') if False else []  # annotate would go here
+            Paciente.objects.annotate(
+                edad_group=Case(
+                    When(edad__lt=18, then=Value('Menores (<18)')),
+                    When(edad__range=[18, 35], then=Value('Jóvenes (18-35)')),
+                    When(edad__range=[36, 60], then=Value('Adultos (36-60)')),
+                    default=Value('Mayores (>60)'),
+                    output_field=CharField(),
+                )
+            ).values('edad_group').annotate(count=Count('id')).order_by('edad_group')
         )
 
         # Por riesgo
@@ -106,6 +116,7 @@ class PacientesSegmentacionView(APIView):
         return Response({
             'distribucion_riesgo': {r['riesgo_enfermedad']: r['count'] for r in riesgo_dist},
             'distribucion_imc': {r['clasificacion_imc']: r['count'] for r in imc_dist},
+            'distribucion_edad': {r['edad_group']: r['count'] for r in segmentos_edad},
         })
 
 
@@ -145,3 +156,38 @@ class DetectarCriticosView(APIView):
             'alertas_generadas': count,
             'mensaje': f'Se generaron {count} alertas de pacientes críticos.',
         })
+
+
+class HeatmapCorrelacionView(APIView):
+    """
+    GET /api/analytics/correlacion/
+    Calcula la correlación de Pearson entre variables clínicas para el Heatmap.
+    Roles: Analista, Administrador.
+    """
+    permission_classes = [IsAuthenticated, EsAnalista]
+
+    @extend_schema(summary="Heatmap de Correlación Clínica")
+    def get(self, request):
+        # Extraer edad del paciente junto con sus signos vitales
+        qs = RegistroClinico.objects.annotate(edad=F('paciente__edad')).values(
+            'edad', 'imc', 'glucosa', 'presion_sistolica', 'presion_diastolica',
+            'frecuencia_cardiaca', 'colesterol', 'saturacion_oxigeno'
+        )
+        if not qs.exists():
+            return Response({"error": "No hay datos suficientes"}, status=404)
+
+        df = pd.DataFrame.from_records(qs)
+        df = df.apply(pd.to_numeric, errors='coerce')
+        corr_matrix = df.corr(method='pearson').fillna(0).round(2)
+
+        labels = corr_matrix.columns.tolist()
+        data = []
+        for i, row_label in enumerate(labels):
+            for j, col_label in enumerate(labels):
+                data.append({
+                    'x': col_label,
+                    'y': row_label,
+                    'v': corr_matrix.iloc[i, j]
+                })
+
+        return Response({'labels': labels, 'data': data})

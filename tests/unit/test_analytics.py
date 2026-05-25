@@ -1,9 +1,8 @@
 """
 Tests para los calculators de analítica clínica.
 """
-import pandas as pd
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
 
 
 class TestPacienteCriticoDetector:
@@ -96,14 +95,14 @@ class TestKPICalculator:
         """HealthMetrics contiene todos los campos necesarios."""
         from apps.analytics.calculators import HealthMetrics
 
-        fields = ['total_pacientes', 'total_registros', 'promedio_edad',
-                  'pacientes_por_riesgo', 'imc_promedio', 'glucosa_promedio',
-                  'presion_sistolica_promedio', 'alertas_activas', 'ultima_ejecucion_etl']
+        missing = [f.name for f in HealthMetrics.__dataclass_fields__.values() if not hasattr(HealthMetrics, f.name)]
+        assert not missing
 
-        assert all(hasattr(HealthMetrics, f.name) for f in HealthMetrics.__dataclass_fields__.values())
+
 
     def test_kpi_calculator_initializes_empty(self):
         """KPICalculator puede instanciarse sin argumentos."""
+
         from apps.analytics.calculators import KPICalculator
 
         calc = KPICalculator()

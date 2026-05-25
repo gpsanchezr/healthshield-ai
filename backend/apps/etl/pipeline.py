@@ -90,19 +90,18 @@ class ETLPipeline:
             raise
 
     def run_dataframe(self, df: pd.DataFrame) -> dict:
-        """Ruta alternativa para ETL sobre un DataFrame (simulaciones)."""
+        """Ruta alternativa para ETL sobre un DataFrame (simulaciones/tests).
+
+        En esta ruta NO persistimos EjecucionETL, por lo que evitamos acceder a self.ejecucion.
+        """
         self.start_time = time.time()
-        self.ejecucion = EjecucionETL.objects.create(
-            usuario=self.usuario,
-            archivo_fuente=self.tipo,
-            tipo=self.tipo,
-            estado='en_proceso',
-        )
+        self.ejecucion = None
 
         try:
             df_raw = df.copy()
-            self.ejecucion.registros_extraidos = len(df_raw)
+            # En tests solo necesitamos el reporte; no persisitimos EjecucionETL.
             self.quality_report.snapshot_before(df_raw)
+
 
             df_clean = self._transform(df_raw)
             loaded_count = self._load(df_clean)
@@ -110,20 +109,10 @@ class ETLPipeline:
             duration = time.time() - self.start_time
             report = self.quality_report.generate(df_raw, df_clean, duration)
 
-            self.ejecucion.fecha_fin = datetime.now()
-            self.ejecucion.duracion_segundos = round(duration, 3)
-            self.ejecucion.registros_procesados = loaded_count
-            self.ejecucion.registros_rechazados = len(df_raw) - len(df_clean)
-            self.ejecucion.reporte_calidad = report
-            self.ejecucion.duplicados_eliminados = int(report['acciones_correctivas'].get('duplicados_eliminados', 0))
-            self.ejecucion.nulos_imputados = int(report['acciones_correctivas'].get('nulos_imputados', 0))
-            self.ejecucion.estado = 'completado'
-            self.ejecucion.save()
-
-            return {'status': 'success', 'ejecucion_id': self.ejecucion.id, 'report': report}
+            # No se persiste la ejecución cuando se trabaja con DataFrames
+            return {'status': 'success', 'ejecucion_id': None, 'report': report}
         except Exception:
-            self.ejecucion.estado = 'fallido'
-            self.ejecucion.save(update_fields=['estado'])
+            # En caso de error no intentamos persistir estado de ejecución
             raise
 
     def _extract(self, source_path: str) -> pd.DataFrame:

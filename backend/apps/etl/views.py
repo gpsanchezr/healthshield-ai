@@ -4,6 +4,8 @@ API endpoints del módulo ETL.
 Controladores para ejecutar pipeline, historial, calidad y simulación.
 """
 import os
+import tempfile
+import pandas as pd
 from django.db import models
 from django.db.models import Count
 from django.utils import timezone
@@ -11,13 +13,15 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.utils import extend_schema
 
 from apps.authentication.permissions import EsAdministrador, EsAnalista, EsMedico
 from .pipeline import ETLPipeline
+from .extractors import CSVExtractor, ExcelExtractor
 from .simulation import DataSimulator
 from .models import EjecucionETL, Paciente, RegistroClinico
-from .serializers import PacienteSerializer, PacienteListSerializer, RegistroClinicoSerializer
+from .serializers import PacienteSerializer, PacienteListSerializer, RegistroClinicoSerializer, SimulateETLSerializer
 
 
 class RunETLView(APIView):
@@ -40,16 +44,31 @@ class RunETLView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Guardar archivo temporalmente
-        temp_path = f'/tmp/etl_upload_{timezone.now().timestamp()}.csv'
-        with open(temp_path, 'wb+') as f:
-            for chunk in archivo.chunks():
-                f.write(chunk)
+        _, ext = os.path.splitext(archivo.name)
+        ext = ext.lower()
+        if ext not in ['.csv', '.xlsx', '.xls']:
+            return Response(
+                {'error': 'Formato no soportado. Use .csv, .xlsx o .xls'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        temp_fd, temp_path = tempfile.mkstemp(suffix=ext)
         try:
+            with os.fdopen(temp_fd, 'wb+') as f:
+                for chunk in archivo.chunks():
+                    f.write(chunk)
+
+            # Validación de formato antes de ejecutar el ETL
+            if ext in ['.xlsx', '.xls']:
+                ExcelExtractor().extract(temp_path)
+            else:
+                CSVExtractor().extract(temp_path)
+
             pipeline = ETLPipeline(usuario=request.user, tipo='manual')
             result = pipeline.run(temp_path)
             return Response(result, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         finally:
@@ -66,12 +85,11 @@ class SimulateDataView(APIView):
     permission_classes = [EsAdministrador]
 
     def post(self, request):
-        count = int(request.data.get('count', 10))
-        if count < 1 or count > 500:
-            return Response(
-                {'error': 'count debe estar entre 1 y 500'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer = SimulateETLSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        count = serializer.validated_data['count']
 
         simulator = DataSimulator()
         df = simulator.generate(count)
@@ -84,7 +102,7 @@ class SimulateDataView(APIView):
 class HistorialETLView(APIView):
     """
     GET /api/etl/historial/
-    Lista el historial de ejecuciones ETL con paginación.
+    Lista las últimas 50 ejecuciones del historial ETL.
     """
     permission_classes = [EsAnalista]
 
@@ -120,7 +138,7 @@ class CalidadReporteView(APIView):
             e = EjecucionETL.objects.get(id=ejecucion_id)
             return Response(e.reporte_calidad or {'error': 'Sin reporte disponible'})
         except EjecucionETL.DoesNotExist:
-            return Response({'error': 'Ejecución no encontrada'}, status=404)
+            return Response({'error': 'Ejecución no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -150,25 +168,11 @@ class RegistroClinicoViewSet(viewsets.ModelViewSet):
 # ViewSet para Paciente — CRUD + búsqueda + estadísticas
 # ─────────────────────────────────────────────────────────────────────────────
 
-class PacientePagination:
+class PacientePagination(PageNumberPagination):
     """Paginación personalizada: 10 pacientes por página."""
-
-    PAGE_SIZE = 10
-
-    def paginate_queryset(self, queryset, request, view=None):
-        from rest_framework.pagination import PageNumberPagination
-        paginator = PageNumberPagination()
-        paginator.page_size = self.PAGE_SIZE
-        return paginator.paginate_queryset(queryset, request)
-
-    def get_paginated_response(self, data):
-        from rest_framework.response import Response
-        return Response({
-            'count': self.PAGE_SIZE,
-            'next': None,
-            'previous': None,
-            'results': data,
-        })
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class PacienteViewSet(viewsets.ModelViewSet):
@@ -187,7 +191,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
     """
     queryset = Paciente.objects.prefetch_related('registros').all()
     permission_classes = [EsMedico]  # cualquier rol authenticated
-    pagination_class = None  # personalizado manual en get_queryset
+    pagination_class = PacientePagination
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -211,7 +215,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
     def buscar(self, request):
         q = request.query_params.get('q', '').strip()
         if not q:
-            return Response({'error': 'Parámetro "q" requerido'}, status=400)
+            return Response({'error': 'Parámetro "q" requerido'}, status=status.HTTP_400_BAD_REQUEST)
 
         qs = Paciente.objects.filter(
             models.Q(nombres__icontains=q) | models.Q(apellidos__icontains=q)

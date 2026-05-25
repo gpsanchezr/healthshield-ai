@@ -6,6 +6,7 @@ from .views import (
     AlertaMarcarVistaView,
     PacientesSegmentacionView,
     DetectarCriticosView,
+    HeatmapCorrelacionView,
 )
 
 urlpatterns = [
@@ -14,4 +15,5 @@ urlpatterns = [
     path('analytics/alertas/<int:alerta_id>/', AlertaMarcarVistaView.as_view(), name='analytics_alerta_vista'),
     path('analytics/segmentacion/', PacientesSegmentacionView.as_view(), name='analytics_segmentacion'),
     path('analytics/detectar-criticos/', DetectarCriticosView.as_view(), name='analytics_detectar_criticos'),
+    path('analytics/correlacion/', HeatmapCorrelacionView.as_view(), name='analytics_correlacion'),
 ]

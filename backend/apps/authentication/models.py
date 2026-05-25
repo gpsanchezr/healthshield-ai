@@ -20,6 +20,7 @@ class UsuarioManager(BaseUserManager):
     def create_superuser(self, username, email, password=None, **extra_fields):
         extra_fields.setdefault('rol', 'administrador')
         extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('is_superuser', True)
         return self.create_user(username=username, email=email, password=password, **extra_fields)
 
 
@@ -54,4 +55,3 @@ class UsuarioClinico(AbstractBaseUser, PermissionsMixin):
     @property
     def is_staff(self):
         return self.rol == self.ROL_ADMIN
-
