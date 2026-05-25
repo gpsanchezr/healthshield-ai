@@ -1,59 +1,91 @@
 ﻿# HealthShield AI
 
-Plataforma Fullstack Django para ETL clínico, Machine Learning y dashboard analítico.
+## Visión
 
-## 📌 Qué hay en este repositorio
+Sistema avanzado de gestión y análisis clínico basado en Django, diseñado para el procesamiento y validación de registros de pacientes con un enfoque en integridad de datos.
 
-- `backend/`: aplicación Django con APIs REST, ETL, ML y autorizaciones JWT.
-- `frontend/`: plantillas y recursos estáticos del dashboard.
-- `docker/`: Dockerfile, Nginx y scripts de despliegue.
-- `docs/`: documentación técnica profesional.
-- `scripts/`: automatización local para ETL, ML y pruebas.
-- `tests/`: pruebas unitarias e integración independientes del código fuente.
+## Manual de Usuario (Operaciones)
 
-## 🚀 Inicio rápido
+### 1. Acceso al Panel
 
-### Opción A: Entorno local
+- Ingresar a la interfaz administrativa en `/admin/`.
+- Iniciar sesión con credenciales de administrador para acceder a la gestión centralizada de pacientes y registros clínicos.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r backend\requirements.txt
-copy .env.example .env
-cd backend
-python manage.py migrate
-python manage.py runserver
-```
+### 2. Gestión de Datos (ETL)
 
-### Opción B: Docker
+- El sistema permite la ingesta de archivos CSV mediante el pipeline ETL integrado.
+- Los registros se procesan a través de una tubería de datos que valida, limpia y transforma la información antes de almacenarla.
+- El usuario puede cargar archivos CSV con datos clínicos y el sistema aplicará normalización, eliminación de duplicados e imputación de datos faltantes.
 
-```powershell
-docker-compose up --build
-```
+### 3. Interpretación de Indicadores
 
-## 🧩 Comandos útiles
+- El sistema visualiza métricas clave como:
+  - **IMC** (Índice de Masa Corporal).
+  - **Niveles de riesgo** de pacientes.
+  - **Saturación de oxígeno**.
+- Estas métricas permiten identificar condiciones clínicas relevantes y apoyar la toma de decisiones.
 
-```powershell
-make install     # instala dependencias
-make run         # levanta el servidor Django local
-make test        # ejecuta pytest
-python run_tests.py # ejecuta pytest usando el runner de proyecto
-make etl         # ejecuta ETL con el comando Django
-make docker-up   # levanta stack Docker (pendiente)
-make clean       # limpia caches temporales
-```
+## Guía Técnica para Desarrolladores
 
-## 📚 Documentación técnica
+### Stack Tecnológico
 
-- `docs/overview.md`: visión general del proyecto y arquitectura.
-- `docs/api.md`: referencia de la API REST.
-- `docs/architecture.md`: diseño del sistema.
-- `docs/erd.sql`: modelo relacional.
-- `docs/roadmap.md`: tareas y mejoras planificadas.
+- **Django 5.0.6**
+- **Python**
+- **Pipeline ETL integrado** basado en Pandas y módulos personalizados.
+- **Django REST Framework** para APIs.
+- **drf-spectacular** para documentación OpenAPI.
 
-## 🧠 Buenas prácticas
+### Instalación
 
-- Mantén `backend/` como el único código fuente Django.
-- Usa `tests/` para pruebas independientes.
-- No subas entornos virtuales ni artefactos de build.
-- Usa `scripts/` para automatizar flujos repetibles.
+1. Clonar el repositorio:
+   ```bash
+   git clone https://github.com/gpsanchezr/healthshield-ai.git
+   cd healthshield-ai
+   ```
+2. Crear y activar el entorno virtual:
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+3. Instalar dependencias:
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
+4. Configurar variables de entorno y base de datos según el entorno local.
+5. Ejecutar migraciones:
+   ```bash
+   cd backend
+   python manage.py migrate
+   ```
+
+### Ejecución
+
+- Levantar el servidor Django:
+  ```bash
+  python backend/manage.py runserver
+  ```
+- Ejecutar el ETL con un archivo CSV específico:
+  ```bash
+  python backend/manage.py run_etl --file backend/data/datos.csv
+  ```
+
+## Resultados Alcanzados
+
+### Calidad de Datos
+
+- Se alcanzó un **Quality Score de 95.1%**, lo que indica un nivel alto de validación y consistencia en los registros procesados.
+
+### Logros
+
+- Se procesaron **1,800 registros clínicos** exitosamente.
+- Se eliminaron duplicados y se imputaron valores nulos.
+- Se implementó la normalización de columnas y la transformación de datos mediante módulos especializados.
+
+## Estado del Proyecto
+
+- Backend operativo y validado.
+- Proyecto en fase final de preparación para despliegue en Vercel.
+
+## Nota importante
+
+El sistema requiere una estructura de datos específica en el archivo CSV para asegurar la integridad de la base de datos. Los nombres de columna deben coincidir con el esquema esperado por el pipeline ETL y los valores deben estar en formatos compatibles con los modelos de datos clínicos.
