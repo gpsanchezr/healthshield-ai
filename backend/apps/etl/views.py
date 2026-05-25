@@ -104,7 +104,7 @@ class HistorialETLView(APIView):
     permission_classes = [EsAnalista]
 
     def get(self, _request):
-        ejecuciones = EjecucionETL.objects.order_by('-fecha_inicio')[:50]
+        ejecuciones = EjecucionETL.objects.order_by('-fecha_inicio')[:50]  # type: ignore[attr-defined]
         data = [
             {
                 'id': e.id,
@@ -132,7 +132,7 @@ class CalidadReporteView(APIView):
 
     def get(self, _request, ejecucion_id):
         try:
-            e = EjecucionETL.objects.get(id=ejecucion_id)
+            e = EjecucionETL.objects.get(id=ejecucion_id)  # type: ignore[attr-defined]
             return Response(e.reporte_calidad or {'error': 'Sin reporte disponible'})
         except EjecucionETL.DoesNotExist:
             return Response({'error': 'Ejecución no encontrada'}, status=status.HTTP_404_NOT_FOUND)
@@ -154,7 +154,7 @@ class RegistroClinicoViewSet(viewsets.ModelViewSet):
       PUT    /api/etl/registros/{id}/         → actualizar
       DELETE /api/etl/registros/{id}/         → eliminar
     """
-    queryset = RegistroClinico.objects.select_related('paciente').all()
+    queryset = RegistroClinico.objects.select_related('paciente').all()  # type: ignore[attr-defined]
     serializer_class = RegistroClinicoSerializer
     permission_classes = [IsAuthenticated]
 
@@ -184,7 +184,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
       GET    /api/pacientes/{id}/registros/  → historial clínico del paciente
       GET    /api/pacientes/estadisticas/    → KPIs generales
     """
-    queryset = Paciente.objects.prefetch_related('registros').all()
+    queryset = Paciente.objects.prefetch_related('registros').all()  # type: ignore[attr-defined]
     permission_classes = [EsMedico]  # cualquier rol authenticated
     pagination_class = PacientePagination
 
@@ -212,7 +212,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
         if not q:
             return Response({'error': 'Parámetro "q" requerido'}, status=status.HTTP_400_BAD_REQUEST)
 
-        qs = Paciente.objects.filter(
+        qs = Paciente.objects.filter(  # type: ignore[attr-defined]
             models.Q(nombres__icontains=q) | models.Q(apellidos__icontains=q)
         )[:50]
         serializer = PacienteListSerializer(qs, many=True)
@@ -241,15 +241,15 @@ class PacienteViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['get'])
     def estadisticas(self, _request):
-        total = Paciente.objects.count()
-        por_sexo = list(Paciente.objects.values('sexo').annotate(c=Count('sexo')))
+        total = Paciente.objects.count()  # type: ignore[attr-defined]
+        por_sexo = list(Paciente.objects.values('sexo').annotate(c=Count('sexo')))  # type: ignore[attr-defined]
 
-        menores = Paciente.objects.filter(edad__lt=18).count()
-        jovenes = Paciente.objects.filter(edad__gte=18, edad__lte=35).count()
-        adultos = Paciente.objects.filter(edad__gte=36, edad__lte=60).count()
-        mayores = Paciente.objects.filter(edad__gt=60).count()
+        menores = Paciente.objects.filter(edad__lt=18).count()  # type: ignore[attr-defined]
+        jovenes = Paciente.objects.filter(edad__gte=18, edad__lte=35).count()  # type: ignore[attr-defined]
+        adultos = Paciente.objects.filter(edad__gte=36, edad__lte=60).count()  # type: ignore[attr-defined]
+        mayores = Paciente.objects.filter(edad__gt=60).count()  # type: ignore[attr-defined]
 
-        por_riesgo = list(RegistroClinico.objects.values('riesgo_enfermedad').annotate(
+        por_riesgo = list(RegistroClinico.objects.values('riesgo_enfermedad').annotate(  # type: ignore[attr-defined]
             total=Count('riesgo_enfermedad')
         ))
         return Response({

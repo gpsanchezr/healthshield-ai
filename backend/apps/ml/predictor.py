@@ -24,7 +24,7 @@ class ModelPredictor:
     def _load_active_model(self):
         """Carga el modelo activo desde la BD o disco."""
         try:
-            ml_record = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
+            ml_record = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()  # type: ignore[attr-defined]
         except RuntimeError as exc:
             logger.warning("[Predictor] DB no disponible, usando modelo por defecto: %s", exc)
             ml_record = None

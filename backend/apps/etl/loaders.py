@@ -27,7 +27,7 @@ class DatabaseLoader:
         df = df.where(pd.notnull(df), None)
 
         for _, row in df.iterrows():
-            paciente, _ = Paciente.objects.get_or_create(
+            paciente, _ = Paciente.objects.get_or_create(  # type: ignore[attr-defined]
                 id_paciente_original=int(row['id_paciente']),
                 defaults={
                     'nombres': row.get('nombres', '') or '',
@@ -37,7 +37,7 @@ class DatabaseLoader:
                 },
             )
 
-            RegistroClinico.objects.create(
+            RegistroClinico.objects.create(  # type: ignore[attr-defined]
                 paciente=paciente,
                 peso=row.get('peso'),
                 altura=row.get('altura'),

@@ -1,3 +1,4 @@
+from typing import Any, cast
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -14,6 +15,11 @@ from .serializers import (
     ModeloMLSerializer,
 )
 
+Paciente = cast(Any, Paciente)
+RegistroClinico = cast(Any, RegistroClinico)
+ModeloML = cast(Any, ModeloML)
+Prediccion = cast(Any, Prediccion)
+
 
 class PredecirRiesgoView(APIView):
     """
@@ -28,17 +34,17 @@ class PredecirRiesgoView(APIView):
         description="Ejecuta el modelo Random Forest sobre los datos clínicos del paciente y retorna explicaciones XAI.",
         responses={200: PrediccionSerializer},
     )
-    def post(self, request, paciente_id):
+    def post(self, _request, paciente_id):
         try:
-            paciente = Paciente.objects.get(id=paciente_id)
-        except Paciente.DoesNotExist:
+            paciente = Paciente.objects.get(id=paciente_id)  # type: ignore[attr-defined]
+        except Paciente.DoesNotExist:  # type: ignore[attr-defined]
             return Response(
                 {'error': 'Paciente no encontrado'},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # Obtener último registro clínico
-        registro = RegistroClinico.objects.filter(paciente=paciente).order_by('-fecha_consulta').first()
+        registro = RegistroClinico.objects.filter(paciente=paciente).order_by('-fecha_consulta').first()  # type: ignore[attr-defined]
         if not registro:
             return Response(
                 {'error': 'El paciente no tiene registros clínicos'},
@@ -62,7 +68,7 @@ class PredecirRiesgoView(APIView):
         }
 
         # Obtener modelo activo de manera segura
-        modelo_activo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
+        modelo_activo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()  # type: ignore[attr-defined]
         if not modelo_activo or not modelo_activo.archivo_modelo:
             return Response(
                 {'error': 'No hay un modelo de Machine Learning activo o configurado.'},
@@ -74,7 +80,7 @@ class PredecirRiesgoView(APIView):
         result = predictor.predict(registro_data)
 
         # Guardar predicción en BD
-        prediccion = Prediccion.objects.create(
+        prediccion = Prediccion.objects.create(  # type: ignore[attr-defined]
             paciente=paciente,
             modelo=modelo_activo,
             riesgo_predicho=result['riesgo_predicho'],
@@ -102,8 +108,8 @@ class ModeloMetricsView(APIView):
         description="Retorna todos los modelos entrenados con métricas.",
         responses={200: ModeloMLSerializer(many=True)},
     )
-    def get(self, request):
-        modelos = ModeloML.objects.order_by('-entrenado_en')[:10]
+    def get(self, _request):
+        modelos = ModeloML.objects.order_by('-entrenado_en')[:10]  # type: ignore[attr-defined]
         serializer = ModeloMLSerializer(modelos, many=True)
         return Response({'modelos': serializer.data})
 
@@ -120,8 +126,8 @@ class ModeloActivoMetricsView(APIView):
         summary="Métricas del modelo activo",
         description="Retorna accuracy, precision, recall, f1 del modelo actualmente activo.",
     )
-    def get(self, request):
-        modelo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
+    def get(self, _request):
+        modelo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()  # type: ignore[attr-defined]
         if not modelo:
             return Response({'error': 'No hay modelo activo'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -221,7 +227,7 @@ class PredecirSignosView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        modelo_activo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
+        modelo_activo = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()  # type: ignore[attr-defined]
         if not modelo_activo or not modelo_activo.archivo_modelo:
             return Response(
                 {'error': 'No hay un modelo de Machine Learning activo.'},
