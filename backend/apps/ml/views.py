@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
-from apps.authentication.permissions import EsMedico, EsAdministrador
+from apps.authentication.permissions import EsMedico
 from apps.etl.models import Paciente, RegistroClinico
 
 from .models import ModeloML, Prediccion
@@ -12,7 +12,6 @@ from .predictor import ModelPredictor
 from .serializers import (
     PrediccionSerializer,
     ModeloMLSerializer,
-    PrediccionPacienteRequestSerializer,
 )
 
 
@@ -172,16 +171,16 @@ class PredecirSignosView(APIView):
             'application/json': {
                 'type': 'object',
                 'properties': {
-                    'edad':         {'type': 'number', 'description': 'Años'},
-                    'imc':          {'type': 'number', 'description': 'Índice de masa corporal'},
-                    'presion_sistolica':  {'type': 'number', 'description': 'mmHg'},
+                    'edad': {'type': 'number', 'description': 'Años'},
+                    'imc': {'type': 'number', 'description': 'Índice de masa corporal'},
+                    'presion_sistolica': {'type': 'number', 'description': 'mmHg'},
                     'presion_diastolica': {'type': 'number', 'description': 'mmHg'},
                     'frecuencia_cardiaca': {'type': 'number', 'description': 'lpm'},
-                    'glucosa':      {'type': 'number', 'description': 'mg/dL'},
-                    'colesterol':   {'type': 'number', 'description': 'mg/dL'},
+                    'glucosa': {'type': 'number', 'description': 'mg/dL'},
+                    'colesterol': {'type': 'number', 'description': 'mg/dL'},
                     'saturacion_oxigeno': {'type': 'number', 'description': '%'},
-                    'temperatura':  {'type': 'number', 'description': '°C'},
-                    'fumador':      {'type': 'boolean'},
+                    'temperatura': {'type': 'number', 'description': '°C'},
+                    'fumador': {'type': 'boolean'},
                     'consumo_alcohol': {'type': 'boolean'},
                     'antecedentes_familiares': {'type': 'boolean'},
                 },
@@ -202,9 +201,9 @@ class PredecirSignosView(APIView):
                         'items': {
                             'type': 'object',
                             'properties': {
-                                'variable':   {'type': 'string'},
-                                'impacto':    {'type': 'number'},
-                                'direccion':  {'type': 'string'},
+                                'variable': {'type': 'string'},
+                                'impacto': {'type': 'number'},
+                                'direccion': {'type': 'string'},
                             },
                         },
                     },

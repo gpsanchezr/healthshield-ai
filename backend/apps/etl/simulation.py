@@ -13,7 +13,6 @@ Uso:
     result = pipeline.run_dataframe(df)
 """
 import random
-import string
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -89,34 +88,36 @@ class DataSimulator:
         temperatura = round(self._rand.uniform(36.0, 39.5), 1)
 
         return {
-            'id_paciente':             self._id_counter,
-            'nombres':                 self._rand.choice(NOMBRES),
-            'apellidos':               self._rand.choice(APELLIDOS),
-            'edad':                    edad,
-            'peso':                    peso,
-            'altura':                  altura,
-            'IMC':                     imc,
-            'presión_sistólica':       presion_sistolica,
-            'presión_diastólica':      presion_diastolica,
-            'frecuencia_cardiaca':     fc,
-            'glucosa':                 glucosa,
-            'colesterol':              colesterol,
-            'saturación_oxígeno':      sat_o2,
-            'temperatura':             temperatura,
-            'sexo':                    self._rand.choice(SEXO_VARIANTS),
+            'id_paciente': self._id_counter,
+            'nombres': self._rand.choice(NOMBRES),
+            'apellidos': self._rand.choice(APELLIDOS),
+            'edad': edad,
+            'peso': peso,
+            'altura': altura,
+            'IMC': imc,
+            'presión_sistólica': presion_sistolica,
+            'presión_diastólica': presion_diastolica,
+            'frecuencia_cardiaca': fc,
+            'glucosa': glucosa,
+            'colesterol': colesterol,
+            'saturación_oxígeno': sat_o2,
+            'temperatura': temperatura,
+            'sexo': self._rand.choice(SEXO_VARIANTS),
             'antecedentes_familiares': self._rand.choice([True, False]),
-            'fumador':                 self._rand.choice([True, False]),
-            'consumo_alcohol':         self._rand.choice([True, False]),
-            'actividad_física':        self._rand.choice(ACTIVIDAD),
-            'diagnóstico_preliminar':  self._rand.choice(DIAGNOSTICOS),
-            'riesgo_enfermedad':       self._rand.choice(RIESGO),
-            'fecha_consulta':          self._random_date(),
+            'fumador': self._rand.choice([True, False]),
+            'consumo_alcohol': self._rand.choice([True, False]),
+            'actividad_física': self._rand.choice(ACTIVIDAD),
+            'diagnóstico_preliminar': self._rand.choice(DIAGNOSTICOS),
+            'riesgo_enfermedad': self._rand.choice(RIESGO),
+            'fecha_consulta': self._random_date(),
         }
 
     def _inject_errors(self, df: pd.DataFrame) -> pd.DataFrame:
         """Inyecta errores intencionales para simular datos del mundo real."""
         n = len(df)
-        error_indices = lambda: self._rand.sample(range(n), max(1, int(n * self.error_rate)))
+
+        def error_indices() -> list[int]:
+            return self._rand.sample(range(n), max(1, int(n * self.error_rate)))
 
         # Para permitir inyectar valores tipo string/N/A en columnas numéricas sin romper pandas.
         # (Los tests esperan que esto funcione.)
@@ -124,7 +125,6 @@ class DataSimulator:
             df['edad'] = df['edad'].astype(object)
         if 'presión_sistólica' in df.columns:
             df['presión_sistólica'] = df['presión_sistólica'].astype(object)
-
 
         # Nulos en campos numéricos
         for col in ['peso', 'glucosa', 'colesterol', 'temperatura']:

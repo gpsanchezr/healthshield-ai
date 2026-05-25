@@ -5,15 +5,14 @@ Controladores para ejecutar pipeline, historial, calidad y simulación.
 """
 import os
 import tempfile
-import pandas as pd
 from django.db import models
 from django.db.models import Count
-from django.utils import timezone
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from apps.authentication.permissions import EsAdministrador, EsAnalista, EsMedico
@@ -69,8 +68,6 @@ class RunETLView(APIView):
             return Response(result, status=status.HTTP_200_OK)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -106,20 +103,20 @@ class HistorialETLView(APIView):
     """
     permission_classes = [EsAnalista]
 
-    def get(self, request):
+    def get(self, _request):
         ejecuciones = EjecucionETL.objects.order_by('-fecha_inicio')[:50]
         data = [
             {
-                'id':                    e.id,
-                'fecha_inicio':          e.fecha_inicio,
-                'duracion_segundos':     e.duracion_segundos,
-                'registros_extraidos':   e.registros_extraidos,
-                'registros_procesados':  e.registros_procesados,
-                'registros_rechazados':  e.registros_rechazados,
-                'estado':                e.estado,
-                'tipo':                  e.tipo,
-                'usuario':               str(e.usuario) if e.usuario else 'Sistema',
-                'quality_score':         (e.reporte_calidad or {}).get('quality_score'),
+                'id': e.id,
+                'fecha_inicio': e.fecha_inicio,
+                'duracion_segundos': e.duracion_segundos,
+                'registros_extraidos': e.registros_extraidos,
+                'registros_procesados': e.registros_procesados,
+                'registros_rechazados': e.registros_rechazados,
+                'estado': e.estado,
+                'tipo': e.tipo,
+                'usuario': str(e.usuario) if e.usuario else 'Sistema',
+                'quality_score': (e.reporte_calidad or {}).get('quality_score'),
             }
             for e in ejecuciones
         ]
@@ -133,7 +130,7 @@ class CalidadReporteView(APIView):
     """
     permission_classes = [EsAnalista]
 
-    def get(self, request, ejecucion_id):
+    def get(self, _request, ejecucion_id):
         try:
             e = EjecucionETL.objects.get(id=ejecucion_id)
             return Response(e.reporte_calidad or {'error': 'Sin reporte disponible'})
@@ -144,8 +141,6 @@ class CalidadReporteView(APIView):
 # ─────────────────────────────────────────────────────────────────────────────
 # ViewSets automáticos — CRUD de Paciente y RegistroClinico
 # ─────────────────────────────────────────────────────────────────────────────
-
-from rest_framework.permissions import IsAuthenticated
 
 
 class RegistroClinicoViewSet(viewsets.ModelViewSet):
@@ -229,7 +224,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
         tags=['Paciente'],
     )
     @action(detail=True, methods=['get'])
-    def registros(self, request, pk=None):
+    def registros(self, _request, *_args, **_kwargs):
         paciente = self.get_object()
         regs = paciente.registros.all().order_by('-fecha_consulta')
         serializer = RegistroClinicoSerializer(regs, many=True)
@@ -245,7 +240,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
         tags=['Paciente'],
     )
     @action(detail=False, methods=['get'])
-    def estadisticas(self, request):
+    def estadisticas(self, _request):
         total = Paciente.objects.count()
         por_sexo = list(Paciente.objects.values('sexo').annotate(c=Count('sexo')))
 

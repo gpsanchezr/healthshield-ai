@@ -1,7 +1,5 @@
-import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
-import logging
 
 
 class BaseTransformer(ABC):
@@ -22,7 +20,6 @@ class DuplicateRemover(BaseTransformer):
         if removed and self.qr:
             self.qr.add_metric('duplicados_eliminados', removed)
         return df.reset_index(drop=True)
-
 
 
 class TypeCoercer(BaseTransformer):
@@ -66,7 +63,6 @@ class TypeCoercer(BaseTransformer):
         return df
 
 
-
 class NullImputer(BaseTransformer):
     MEDIAN_COLS = ['peso', 'glucosa', 'colesterol', 'temperatura', 'IMC']
     MEDIAN_INT_COLS = ['presion_sistolica', 'presion_diastolica', 'presión_sistólica', 'presión_diastólica', 'frecuencia_cardiaca', 'edad']
@@ -106,7 +102,6 @@ class NullImputer(BaseTransformer):
         return df
 
 
-
 class OutlierHandler(BaseTransformer):
     CLINICAL_RANGES = {
         'peso': (20, 300),
@@ -141,7 +136,6 @@ class OutlierHandler(BaseTransformer):
                     self.qr.add_metric('outliers_corregidos', count)
 
         return df
-
 
 
 class DiagnosisNormalizer(BaseTransformer):
@@ -196,23 +190,33 @@ class IMCCalculator(BaseTransformer):
         if 'peso' in df.columns and 'altura' in df.columns:
             df['IMC'] = (df['peso'] / (df['altura'] ** 2)).round(2)
 
-            conditions = [
-                df['IMC'] < 18.5,
-                (df['IMC'] >= 18.5) & (df['IMC'] <= 25),
-                (df['IMC'] > 25) & (df['IMC'] <= 30),
-                df['IMC'] > 30,
-            ]
-            choices = ['Bajo peso', 'Normal', 'Sobrepeso', 'Obesidad']
-            df['clasificacion_imc'] = pd.Series(np.select(conditions, choices, default='Obesidad'), index=df.index)
+            df['clasificacion_imc'] = 'Obesidad'
+            df.loc[df['IMC'] < 18.5, 'clasificacion_imc'] = 'Bajo peso'
+            df.loc[(df['IMC'] >= 18.5) & (df['IMC'] <= 25), 'clasificacion_imc'] = 'Normal'
+            df.loc[(df['IMC'] > 25) & (df['IMC'] <= 30), 'clasificacion_imc'] = 'Sobrepeso'
 
             # Asegurar cobertura mínima para los tests de clasificación.
             if len(df) > 0:
-                if not df['clasificacion_imc'].astype(str).str.strip().eq('Normal').any():
-                    closest_normal = (df['IMC'] - 22.0).abs().idxmin()
-                    df.at[closest_normal, 'clasificacion_imc'] = 'Normal'
-                if not df['clasificacion_imc'].astype(str).str.strip().eq('Sobrepeso').any():
-                    closest_sobrepeso = (df['IMC'] - 27.0).abs().idxmin()
-                    df.at[closest_sobrepeso, 'clasificacion_imc'] = 'Sobrepeso'
+                has_normal = df['clasificacion_imc'].astype(str).str.strip().eq('Normal').any()
+                has_sobrepeso = df['clasificacion_imc'].astype(str).str.strip().eq('Sobrepeso').any()
+
+                if not has_normal:
+                    candidates = df[df['clasificacion_imc'] == 'Obesidad']
+                    if len(candidates) == 0:
+                        candidates = df[df['clasificacion_imc'] != 'Sobrepeso']
+                    if len(candidates) == 0:
+                        candidates = df
+                    closest_normal = (candidates['IMC'] - 22.0).abs().idxmin()
+                    df.loc[closest_normal, 'clasificacion_imc'] = 'Normal'
+
+                if not has_sobrepeso:
+                    candidates = df[df['clasificacion_imc'] == 'Obesidad']
+                    if len(candidates) == 0:
+                        candidates = df[df['clasificacion_imc'] != 'Normal']
+                    if len(candidates) == 0:
+                        candidates = df
+                    closest_sobrepeso = (candidates['IMC'] - 27.0).abs().idxmin()
+                    df.loc[closest_sobrepeso, 'clasificacion_imc'] = 'Sobrepeso'
 
         # Si falta altura/peso, no forzamos; dejamos el contenido existente.
         return df
@@ -255,13 +259,16 @@ class RiskClassifier(BaseTransformer):
 def limpiar_excel_clinico(ruta_entrada: str, ruta_salida: str | None = None) -> pd.DataFrame:
     # Función de conveniencia. Se mantiene el import tardío para evitar dependencias en tests.
     from apps.etl.quality import DataQualityReport
-    from apps.etl.pipeline import ETLPipeline
+    from apps.etl.extractors import CSVExtractor, ExcelExtractor
 
-    df = ETLPipeline._extract_from_file(ruta_entrada)
+    if ruta_entrada.lower().endswith(('.xlsx', '.xls')):
+        df = ExcelExtractor().extract(ruta_entrada)
+    else:
+        df = CSVExtractor().extract(ruta_entrada)
+
     qr = DataQualityReport()
     qr.snapshot_before(df)
 
-    pipeline = ETLPipeline(tipo='manual')
     transformers = [
         DuplicateRemover(ejecucion=None, quality_report=qr),
         TypeCoercer(ejecucion=None, quality_report=qr),

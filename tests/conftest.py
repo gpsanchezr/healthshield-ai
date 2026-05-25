@@ -59,7 +59,7 @@ def df_with_errors(sample_dataframe):
     import pandas as pd
     import numpy as np
 
-    df = sample_dataframe.copy()
+    df = sample_dataframe.copy().astype(object)
     # Inject errors
     df.at[0, 'peso'] = None                          # nulo
     df.at[1, 'edad'] = 'Treinta'                     # tipo incorrecto

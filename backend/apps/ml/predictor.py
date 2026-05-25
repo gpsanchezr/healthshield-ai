@@ -1,11 +1,9 @@
-import json
 import logging
+import pickle
 from pathlib import Path
 
 import joblib
 import numpy as np
-import pandas as pd
-from django.conf import settings
 
 from .models import ModeloML
 
@@ -27,7 +25,8 @@ class ModelPredictor:
         """Carga el modelo activo desde la BD o disco."""
         try:
             ml_record = ModeloML.objects.filter(activo=True).order_by('-entrenado_en').first()
-        except Exception:
+        except RuntimeError as exc:
+            logger.warning("[Predictor] DB no disponible, usando modelo por defecto: %s", exc)
             ml_record = None
 
         if ml_record and ml_record.archivo_modelo:
@@ -37,10 +36,10 @@ class ModelPredictor:
                     payload = joblib.load(filepath)
                     self.model = payload['model']
                     self.feature_names = payload['feature_names']
-                    logger.info(f"[Predictor] Modelo cargado: {ml_record.nombre}")
+                    logger.info("[Predictor] Modelo cargado: %s", ml_record.nombre)
                     return
-            except Exception as e:
-                logger.warning(f"[Predictor] No se pudo cargar modelo desde disco: {e}")
+            except (OSError, FileNotFoundError, TypeError, ValueError, pickle.PickleError, EOFError) as exc:
+                logger.warning("[Predictor] No se pudo cargar modelo desde disco: %s", exc)
 
         logger.warning("[Predictor] Usando modelo por defecto (sin entrenamiento real)")
         self.model = None
@@ -71,9 +70,9 @@ class ModelPredictor:
         prob_dict = {self.RISK_LABELS[i]: round(float(p), 4) for i, p in enumerate(probabilities)}
 
         # Factores clave (XAI simplificado vía feature importance)
-        factores = self._get_top_features(X)
+        factores = self._get_top_features()
 
-        logger.info(f"[Predictor] Paciente → {riesgo} (confianza={prob_dict[riesgo]})")
+        logger.info("[Predictor] Paciente → %s (confianza=%s)", riesgo, prob_dict[riesgo])
 
         return {
             'riesgo_predicho': riesgo,
@@ -92,18 +91,18 @@ class ModelPredictor:
             if val is None or (isinstance(val, float) and np.isnan(val)):
                 # Medianadummy para datos faltantes
                 val = 0.0
-            
+
             try:
                 val = float(val)
             except (ValueError, TypeError):
                 val = 0.0
-                
+
             values.append(val)
 
         X = np.array(values).reshape(1, -1)
         return X
 
-    def _get_top_features(self, X: np.ndarray) -> list:
+    def _get_top_features(self) -> list:
         """Retorna las N features con mayor importancia/impacto en la predicción."""
         if self.feature_names is None:
             return []
@@ -130,8 +129,8 @@ class ModelPredictor:
                 })
             return factores
 
-        except Exception as e:
-            logger.error(f"[Predictor] Error calculando factores clave: {e}")
+        except (AttributeError, TypeError, ValueError) as exc:
+            logger.error("[Predictor] Error calculando factores clave: %s", exc)
             return []
 
     def _mock_prediction(self, data: dict) -> dict:

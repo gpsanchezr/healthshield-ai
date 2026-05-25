@@ -4,6 +4,7 @@ import re
 from typing import Any
 from django.http import QueryDict
 
+
 class SanitizationMiddleware:
     """
     Middleware de grado industrial para sanitizar inputs.
@@ -51,10 +52,8 @@ class SanitizationMiddleware:
 
     def _sanitize_querydict(self, querydict: QueryDict) -> QueryDict:
         """Limpia recursivamente un objeto QueryDict."""
-        querydict._mutable = True
         for key in querydict:
             values = querydict.getlist(key)
             sanitized_values = [self._sanitize_string(v) for v in values]
             querydict.setlist(key, sanitized_values)
-        querydict._mutable = False
         return querydict
